@@ -77,7 +77,24 @@ export function LeadsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void load();
   }, [load]);
+useEffect(() => {
+  if (!supabase) return;
 
+  const channel = supabase
+    .channel('gab_leads_live')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'gab_leads' },
+      () => {
+        void load();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [load]);
   const updateLead = useCallback(
     async (id: number, patch: LeadPatch): Promise<FriendlyError | null> => {
       if (!supabase) {
