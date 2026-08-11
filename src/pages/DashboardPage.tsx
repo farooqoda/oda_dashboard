@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LeadModal } from '../components/modal/LeadModal';
 import {
   Avatar,
@@ -11,7 +11,7 @@ import {
   PageHeader,
 } from '../components/ui';
 import { useLeads } from '../data/LeadsProvider';
-import { displayName, formatDate, stageOf } from '../lib/format';
+import { displayName, formatDate, pluralise, stageOf } from '../lib/format';
 import { dashboardStats, stageCounts } from '../lib/selectors';
 import { personalityType } from '../lib/traitsRegistry';
 import type { Lead } from '../lib/types';
@@ -73,6 +73,9 @@ export function DashboardPage() {
   const { leads, loading, error, refresh, refreshing } = useLeads();
   const [view, setView] = useState<'board' | 'list'>('board');
   const [openId, setOpenId] = useState<number | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const stats = useMemo(() => dashboardStats(leads), [leads]);
   const stages = useMemo(() => stageCounts(leads), [leads]);
@@ -97,6 +100,30 @@ export function DashboardPage() {
       }),
     [leads],
   );
+
+  const updateScrollState = useCallback(() => {
+    const node = boardRef.current;
+    if (!node) return;
+    // 1px of slack absorbs sub-pixel scroll widths at fractional zoom levels.
+    setCanScrollLeft(node.scrollLeft > 1);
+    setCanScrollRight(node.scrollLeft + node.clientWidth < node.scrollWidth - 1);
+  }, []);
+
+  // Recheck whenever the board appears, the column set changes, or the window
+  // resizes — any of which can make the overflow appear or disappear.
+  useEffect(() => {
+    updateScrollState();
+    if (view !== 'board') return;
+    window.addEventListener('resize', updateScrollState);
+    return () => window.removeEventListener('resize', updateScrollState);
+  }, [updateScrollState, view, stages.length, loading]);
+
+  const scrollBoard = (direction: 1 | -1) => {
+    const node = boardRef.current;
+    if (!node) return;
+    // One column plus its gap, so a click lands on a column boundary.
+    node.scrollBy({ left: direction * (288 + 16), behavior: 'smooth' });
+  };
 
   if (error) {
     return (
@@ -164,8 +191,39 @@ export function DashboardPage() {
 
       <div className="mt-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-slate-900">Pipeline</h2>
-          <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Pipeline</h2>
+            <span className="text-xs text-slate-500">
+              {stages.length} {pluralise(stages.length, 'stage')}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* The board is wider than the viewport at every realistic window
+                size, so it needs an explicit affordance — without one the
+                trailing stages look as though they do not exist. */}
+            {view === 'board' && (canScrollLeft || canScrollRight) ? (
+              <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5">
+                <button
+                  type="button"
+                  onClick={() => scrollBoard(-1)}
+                  disabled={!canScrollLeft}
+                  aria-label="Scroll the board to earlier stages"
+                  className="rounded px-2 py-1 text-sm text-slate-600 hover:text-slate-900 disabled:text-slate-300"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollBoard(1)}
+                  disabled={!canScrollRight}
+                  aria-label="Scroll the board to later stages"
+                  className="rounded px-2 py-1 text-sm text-slate-600 hover:text-slate-900 disabled:text-slate-300"
+                >
+                  →
+                </button>
+              </div>
+            ) : null}
+            <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5">
             {(['board', 'list'] as const).map((v) => (
               <button
                 key={v}
@@ -179,6 +237,7 @@ export function DashboardPage() {
                 {v} view
               </button>
             ))}
+            </div>
           </div>
         </div>
 
@@ -190,7 +249,14 @@ export function DashboardPage() {
             the Row Level Security policy for this anon key does not expose any.
           </EmptyState>
         ) : view === 'board' ? (
-          <div className={`overflow-x-auto pb-2 ${refreshing ? 'is-refreshing' : ''}`}>
+          <div
+            ref={boardRef}
+            onScroll={updateScrollState}
+            tabIndex={0}
+            role="group"
+            aria-label="Pipeline board, scrolls horizontally"
+            className={`overflow-x-auto pb-2 ${refreshing ? 'is-refreshing' : ''}`}
+          >
             <div className="flex min-w-max gap-4">
               {stages.map((row) => {
                 const cards = byStage.get(row.stage) ?? [];
