@@ -79,8 +79,9 @@ export function LeadsProvider({ children }: { children: ReactNode }) {
   }, [load]);
 useEffect(() => {
   if (!supabase) return;
+  const client = supabase;
 
-  const channel = supabase
+  const channel = client
     .channel('gab_leads_live')
     .on(
       'postgres_changes',
@@ -92,7 +93,7 @@ useEffect(() => {
     .subscribe();
 
   return () => {
-    supabase.removeChannel(channel);
+    client.removeChannel(channel);
   };
 }, [load]);
   const updateLead = useCallback(
