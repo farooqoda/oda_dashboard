@@ -151,7 +151,7 @@ export function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        description="Everything below is counted from the rows currently loaded from Supabase."
+        description="Everything below is counted from the leads currently loaded for your account."
         actions={
           <button type="button" className="btn-secondary" onClick={refresh} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh'}

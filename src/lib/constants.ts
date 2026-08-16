@@ -66,3 +66,9 @@ export const MAX_ROWS = 1000;
 
 export const FIT_HIGH = 70;
 export const FIT_MID = 40;
+
+/**
+ * Shown on Settings and wherever the user needs a human. Change this to the
+ * address your team actually monitors.
+ */
+export const SUPPORT_EMAIL = 'support@ontariodigitalacademy.org';

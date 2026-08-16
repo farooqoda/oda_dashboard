@@ -11,7 +11,7 @@ import {
 } from 'react';
 import {
   clearPendingInvite,
-  fetchClientId,
+  fetchClientLink,
   redeemInvite,
   storePendingInvite,
   takePendingInvite,
@@ -35,6 +35,16 @@ interface AuthContextValue {
   user: User | null;
   /** The tenant this user belongs to. Never used as a query filter — RLS does that. */
   clientId: string | null;
+  /** Human-readable client name when the join row carries one. */
+  clientName: string | null;
+  /**
+   * True from the moment an invite is redeemed until the user leaves the
+   * "Setup complete" screen. Set on both signup paths — immediately when
+   * signUp returns a session, and on first sign-in when a parked code is
+   * redeemed — so the licence key is shown once either way.
+   */
+  setupCompleted: boolean;
+  dismissSetup: () => void;
   /** A failure while reading gab_user_clients, as opposed to simply having no row. */
   linkError: FriendlyError | null;
   signIn: (email: string, password: string) => Promise<FriendlyError | null>;
@@ -60,6 +70,8 @@ const CONFIG_ERROR: FriendlyError = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
+  const [clientName, setClientName] = useState<string | null>(null);
+  const [setupCompleted, setSetupCompleted] = useState(false);
   const [linkError, setLinkError] = useState<FriendlyError | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [linkChecked, setLinkChecked] = useState(false);
@@ -93,6 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthReady(true);
       if (!next) {
         setClientId(null);
+        setClientName(null);
+        setSetupCompleted(false);
         setLinkError(null);
         setLinkChecked(true);
       } else {
@@ -116,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { clientId: found, error } = await fetchClientId(supabase, userId);
+    const { clientId: found, clientName: foundName, error } = await fetchClientLink(supabase, userId);
     if (!mounted.current) return;
 
     if (error) {
@@ -129,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (found) {
       clearPendingInvite();
       setClientId(found);
+      setClientName(foundName ?? null);
       setLinkError(null);
       setLinkChecked(true);
       return;
@@ -140,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted.current) return;
       if (result.clientId) {
         setClientId(result.clientId);
+        setSetupCompleted(true);
         setLinkError(null);
         setLinkChecked(true);
         return;
@@ -194,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return {
           error: {
             message: 'Sign up did not return a user account.',
-            hint: 'Check the Authentication settings for this Supabase project.',
+            hint: 'Contact support if this keeps happening.',
             code: null,
           },
           needsEmailConfirmation: false,
@@ -218,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (mounted.current) {
         setClientId(result.clientId);
+        setSetupCompleted(true);
         setLinkError(null);
         setLinkChecked(true);
       }
@@ -236,6 +253,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.error) return result.error;
       if (mounted.current) {
         setClientId(result.clientId);
+        // Same as the two signup paths: this is the moment the account becomes
+        // usable, and it is the user's only chance to see their extension key.
+        setSetupCompleted(true);
         setLinkError(null);
         setLinkChecked(true);
       }
@@ -250,9 +270,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!mounted.current) return;
     setSession(null);
     setClientId(null);
+    setClientName(null);
+    setSetupCompleted(false);
     setLinkError(null);
     setLinkChecked(true);
   }, []);
+
+  const dismissSetup = useCallback(() => setSetupCompleted(false), []);
 
   const refreshLink = useCallback(async () => {
     setLinkChecked(false);
@@ -274,6 +298,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       user: session?.user ?? null,
       clientId,
+      clientName,
+      setupCompleted,
+      dismissSetup,
       linkError,
       signIn,
       signUp,
@@ -281,7 +308,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       linkWithInvite,
       refreshLink,
     }),
-    [status, session, clientId, linkError, signIn, signUp, signOut, linkWithInvite, refreshLink],
+    [
+      status,
+      session,
+      clientId,
+      clientName,
+      setupCompleted,
+      dismissSetup,
+      linkError,
+      signIn,
+      signUp,
+      signOut,
+      linkWithInvite,
+      refreshLink,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

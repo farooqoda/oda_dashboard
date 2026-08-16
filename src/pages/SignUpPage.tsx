@@ -44,7 +44,7 @@ export function SignUpPage() {
       >
         <div className="space-y-3 text-sm text-slate-700">
           <p>
-            Supabase has emailed a confirmation link to{' '}
+            A confirmation link has been emailed to{' '}
             <span className="font-medium text-slate-900">{email.trim()}</span>. Open it, then sign
             in.
           </p>

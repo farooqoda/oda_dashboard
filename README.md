@@ -64,6 +64,24 @@ Nothing behind the gate **mounts** before there is a session, not merely nothing
 `LeadsProvider` fetches on mount, so mounting it early would fire queries with no JWT and
 show a spurious RLS error before the login form had even appeared.
 
+### The licence key handoff
+
+Redeeming an invite lands the user on a one-time **Setup complete** screen showing the
+`license_key` from their own `gab_users` row, with a Copy button. All three redemption paths
+route through it — signup with a session, a parked code redeemed on first sign-in, and the
+"Link your account" recovery screen — so the key is never skipped.
+
+That key is the credential for the **LinkedIn extension**, paired with the same email. It is
+not the dashboard password, and the dashboard password is not it; the screen says so, because
+having two credentials for one account is exactly the kind of thing users conflate. It is
+shown once and is deliberately not repeated anywhere else in the app, Settings included.
+
+The row is generated server-side and may not exist the instant `signUp` resolves, so a
+missing row is retried with backoff before being reported. An RLS refusal is **not** retried —
+it will not fix itself. If the key cannot be read for any reason the account still works and
+the screen says so, pointing at support, rather than blocking the user behind a value they
+do not strictly need to use the dashboard.
+
 ### Supabase project settings
 
 * Enable the **Email** provider under Authentication → Providers.
@@ -170,6 +188,9 @@ because it is a database migration rather than app code and you did not ask for 
   one, since `linkedin_url` is only unique per client).
 * `gab_client_invites`, `gab_user_clients` — touched only during sign up and sign in, to
   resolve which client an account belongs to.
+* `gab_users` — the signed-in user reads **their own row only**, once, for `license_key`.
+  Requires a policy such as
+  `create policy "read own user row" on gab_users for select using (user_id = auth.uid());`
 * `gab_users`, `gab_clients`, `gab_frameworks`, `gab_invite_log` — never touched. They hold
   licence keys and are deliberately locked.
 
@@ -274,6 +295,18 @@ panel or the word "undefined".
 
 ---
 
+## Settings, and where errors show up
+
+Settings carries no backend branding: no vendor name, no project URL or hostname, no mention
+of the database engine or of API keys. It shows a generic system status, the signed-in email,
+the client, the account's total lead count, a support address, and a Log out button.
+
+That makes it the **one screen that does not surface raw query errors** — a failure there is
+reported as "System status: Unavailable" with a route to a human. Every other screen still
+shows the real message with the RLS hint, because those are working surfaces where diagnosing
+a failure is the point. The support address is `SUPPORT_EMAIL` in
+[`src/lib/constants.ts`](src/lib/constants.ts) — change it to an address your team monitors.
+
 ## What this app deliberately does not do
 
 * **No sending, sequences, campaigns, scheduling or reply tracking.** Nothing in `gab_leads`
@@ -300,7 +333,7 @@ src/
     supabase.ts         client + the error-to-message mapping (RLS hints live here)
     format.ts           initials, dates, fit bands, pill colours
     csv.ts              export of the current filtered set
-    auth.ts             invite redemption, auth error messages, the table/column assumptions
+    auth.ts             invite redemption, licence key, auth errors, table/column assumptions
   data/
     AuthProvider.tsx    session, client_id, sign in / sign up / sign out
     LeadsProvider.tsx   one fetch, shared by every screen; optimistic writes with rollback

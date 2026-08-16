@@ -48,7 +48,7 @@ export function toAuthError(error: unknown): FriendlyError {
 
   const friendly = (message: string, hint: string | null = null): FriendlyError => ({
     message,
-    hint: hint ?? (raw && raw !== message ? `Supabase said: ${raw}` : null),
+    hint: hint ?? (raw && raw !== message ? `Details: ${raw}` : null),
     code: base.code,
   });
 
@@ -58,7 +58,7 @@ export function toAuthError(error: unknown): FriendlyError {
   if (/email not confirmed/i.test(raw)) {
     return friendly(
       'This email address has not been confirmed yet.',
-      'Open the confirmation link Supabase emailed you, then sign in again.',
+      'Open the confirmation link that was emailed to you, then sign in again.',
     );
   }
   if (/user already registered|already been registered/i.test(raw)) {
@@ -68,15 +68,15 @@ export function toAuthError(error: unknown): FriendlyError {
     );
   }
   if (/password should be at least|password.*too short/i.test(raw)) {
-    return friendly('That password is too short for this project’s policy.', `Supabase said: ${raw}`);
+    return friendly('That password is too short for this project’s policy.', `Details: ${raw}`);
   }
   if (/rate limit|too many requests/i.test(raw)) {
     return friendly('Too many attempts. Wait a minute and try again.');
   }
   if (/signups not allowed|signup is disabled/i.test(raw)) {
     return friendly(
-      'Sign up is disabled for this Supabase project.',
-      'Enable email signups in Authentication → Providers, or ask an administrator to create the account.',
+      'Sign up is not currently enabled.',
+      'Ask an administrator to enable sign ups or to create the account for you.',
     );
   }
   return base;
@@ -270,28 +270,104 @@ async function unlink(client: SupabaseClient, userId: string, clientId: string):
 }
 
 /**
- * The client_id for the signed-in user, read from their own row.
+ * The client the signed-in user belongs to, read from their own row.
  * Returns `undefined` for "no row" — a distinct state from "query failed",
  * because the two need different screens.
+ *
+ * A human-readable client name is picked up opportunistically: the join table
+ * may or may not carry one, and Settings prefers it over the raw id.
  */
-export async function fetchClientId(
+export async function fetchClientLink(
   client: SupabaseClient,
   userId: string,
-): Promise<{ clientId: string | undefined; error: FriendlyError | null }> {
+): Promise<{
+  clientId: string | undefined;
+  clientName: string | undefined;
+  error: FriendlyError | null;
+}> {
   const { data, error } = await client
     .from(AUTH_TABLES.userClients)
-    .select(AUTH_COLUMNS.clientId)
+    .select('*')
     .eq(AUTH_COLUMNS.userId, userId)
     .limit(1);
 
-  if (error) return { clientId: undefined, error: toFriendlyError(error) };
+  if (error) return { clientId: undefined, clientName: undefined, error: toFriendlyError(error) };
 
   const row = (data ?? [])[0] as Record<string, unknown> | undefined;
   const clientId = row?.[AUTH_COLUMNS.clientId];
+
+  let clientName: string | undefined;
+  for (const column of ['client_name', 'name', 'display_name', 'company_name']) {
+    const value = row?.[column];
+    if (typeof value === 'string' && value.trim()) {
+      clientName = value.trim();
+      break;
+    }
+  }
+
   return {
     clientId: typeof clientId === 'string' && clientId.trim() ? clientId : undefined,
+    clientName,
     error: null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Licence key
+// ---------------------------------------------------------------------------
+
+/** The table holding the per-user generated licence key. */
+export const USERS_TABLE = 'gab_users';
+export const LICENSE_KEY_COLUMN = 'license_key';
+
+export type LicenseKeyOutcome =
+  /** Found it. */
+  | { state: 'found'; licenseKey: string }
+  /** The row exists but the key column is empty. */
+  | { state: 'empty' }
+  /** No row for this user yet — generation may not have run. */
+  | { state: 'missing' }
+  /** The read failed, usually because RLS does not expose the row. */
+  | { state: 'error'; error: FriendlyError };
+
+/**
+ * Reads the signed-in user's own licence key.
+ *
+ * The row is generated for them server-side, which may not have happened by
+ * the instant signUp resolves, so a missing row is retried briefly with
+ * backoff before being reported as missing. An RLS refusal is NOT retried —
+ * it will not fix itself, and retrying only delays the message.
+ */
+export async function fetchLicenseKey(
+  client: SupabaseClient,
+  userId: string,
+  attempts = 4,
+): Promise<LicenseKeyOutcome> {
+  let delay = 400;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const { data, error } = await client
+      .from(USERS_TABLE)
+      .select(LICENSE_KEY_COLUMN)
+      .eq(AUTH_COLUMNS.userId, userId)
+      .limit(1);
+
+    if (error) return { state: 'error', error: toFriendlyError(error) };
+
+    const row = (data ?? [])[0] as Record<string, unknown> | undefined;
+    if (row) {
+      const key = row[LICENSE_KEY_COLUMN];
+      if (typeof key === 'string' && key.trim()) return { state: 'found', licenseKey: key.trim() };
+      return { state: 'empty' };
+    }
+
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2;
+    }
+  }
+
+  return { state: 'missing' };
 }
 
 // ---------------------------------------------------------------------------

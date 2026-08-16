@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../data/AuthProvider';
 import { LinkAccountPage } from '../pages/LinkAccountPage';
+import { SetupCompletePage } from '../pages/SetupCompletePage';
 
 /**
  * The gate. Nothing behind it renders — and, importantly, nothing behind it
@@ -10,7 +11,7 @@ import { LinkAccountPage } from '../pages/LinkAccountPage';
  * spurious RLS error before the user has even seen the login form.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { status } = useAuth();
+  const { status, setupCompleted } = useAuth();
   const location = useLocation();
 
   if (status === 'loading') return <BootScreen />;
@@ -20,6 +21,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (status === 'unlinked') return <LinkAccountPage />;
+
+  // Sits between the gate and the dashboard so it is reached identically
+  // whether the invite was redeemed at signup or on a later first sign-in.
+  if (setupCompleted) return <SetupCompletePage />;
 
   return <>{children}</>;
 }
