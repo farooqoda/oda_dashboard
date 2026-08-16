@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
+import { RequireAuth } from './components/RequireAuth';
 import { Sidebar } from './components/Sidebar';
+import { AuthProvider } from './data/AuthProvider';
 import { LeadsProvider } from './data/LeadsProvider';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LeadsPage } from './pages/LeadsPage';
+import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OutreachPage } from './pages/OutreachPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SignUpPage } from './pages/SignUpPage';
 
 function Shell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -68,8 +72,25 @@ function Shell() {
 
 export default function App() {
   return (
-    <LeadsProvider>
-      <Shell />
-    </LeadsProvider>
+    <AuthProvider>
+      <Routes>
+        {/* Public. These are the only routes reachable without a session. */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignUpPage />} />
+
+        {/* Everything else. LeadsProvider mounts inside the gate, so no query
+            is ever issued before the user is authenticated. */}
+        <Route
+          path="*"
+          element={
+            <RequireAuth>
+              <LeadsProvider>
+                <Shell />
+              </LeadsProvider>
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </AuthProvider>
   );
 }

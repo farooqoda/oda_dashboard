@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, ErrorState, PageHeader } from '../components/ui';
+import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
 import { MAX_ROWS } from '../lib/constants';
 import { formatDateTime, isProfiled } from '../lib/format';
@@ -58,6 +59,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function SettingsPage() {
   const { leads, error: leadsError, lastLoadedAt } = useLeads();
+  const { user, clientId } = useAuth();
   const { counts, error: countError, loading } = useRowCounts();
 
   const connected = !!supabase && !leadsError;
@@ -94,9 +96,20 @@ export function SettingsPage() {
               }
             />
             <Row label="Project URL" value={supabaseUrl ?? 'Not configured'} />
+            <Row label="Signed in as" value={user?.email ?? 'Not signed in'} />
             <Row
-              label="Key in use"
-              value="Anon public key (SELECT on gab_leads and gab_activity, UPDATE on gab_leads)"
+              label="Client"
+              value={
+                clientId ? (
+                  <span className="font-mono">{clientId}</span>
+                ) : (
+                  'Not linked to a client'
+                )
+              }
+            />
+            <Row
+              label="Access"
+              value="Your own Supabase Auth session. Row Level Security scopes every query to your client — this app applies no client filter of its own."
             />
             <Row
               label="Last successful load"
@@ -135,6 +148,10 @@ export function SettingsPage() {
           <div className="divide-y divide-slate-100">
             <Row label="gab_leads" value="Read and update (stage, connection status, review status)" />
             <Row label="gab_activity" value="Read only" />
+            <Row
+              label="gab_client_invites, gab_user_clients"
+              value="Touched only during sign up and sign in, to resolve which client an account belongs to"
+            />
             <Row
               label="gab_users, gab_clients, gab_frameworks, gab_invite_log"
               value="Not accessible — deliberately locked by Row Level Security"

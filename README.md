@@ -26,10 +26,10 @@ npm run dev               # http://localhost:5173
 | `VITE_SUPABASE_ANON_KEY` | The anon **public** key |
 
 Vite only exposes variables prefixed with `VITE_`, and both of these end up in the browser
-bundle. That is safe here only because Row Level Security is on and the anon role is limited
-to `SELECT` on `gab_leads` / `gab_activity` and `UPDATE` on `gab_leads`. **Never put a
-service-role key in `.env`.** `.env` is gitignored; `.env.example` is the file that is
-committed.
+bundle. That is safe here only because Row Level Security is on and the anon key grants
+nothing on its own — every data query runs under the signed-in user's own JWT, and RLS scopes
+it to their client. **Never put a service-role key in `.env`.** `.env` is gitignored;
+`.env.example` is the file that is committed.
 
 Missing configuration is a rendered state, not a crash — the app boots and tells you which
 variables are missing.
@@ -42,12 +42,134 @@ npm run typecheck   # tsc --noEmit
 npm run preview     # serve the built output
 ```
 
+## Authentication
+
+Each person signs in with their own Supabase Auth account. There is no shared key and **no
+client filter anywhere in the app** — isolation is entirely RLS's job, scoping every query
+to whichever client the signed-in user belongs to.
+
+```
+Sign up (email + password + invite code)
+    └─ auth.signUp
+         ├─ session returned  → redeem invite immediately → dashboard
+         └─ no session        → park the code, ask the user to confirm their email
+                                  └─ redeemed automatically on first sign-in
+
+Sign in (email + password)
+    └─ read the user's own row in gab_user_clients → client_id → dashboard
+         └─ no row → "Link your account" screen (enter an invite code)
+```
+
+Nothing behind the gate **mounts** before there is a session, not merely nothing renders:
+`LeadsProvider` fetches on mount, so mounting it early would fire queries with no JWT and
+show a spurious RLS error before the login form had even appeared.
+
+### Supabase project settings
+
+* Enable the **Email** provider under Authentication → Providers.
+* Either setting for **Confirm email** works. With it off, signup redeems the invite straight
+  away. With it on, `signUp` returns a user but no session — there is no JWT to write with —
+  so the code is parked in `localStorage` and redeemed on first sign-in. The signup screen
+  says so explicitly rather than appearing to lose the code.
+
+### Tables used for access control
+
+These two were not part of the original data model, so the **column names below are
+assumptions**. They are collected in `AUTH_TABLES` / `AUTH_COLUMNS` at the top of
+[`src/lib/auth.ts`](src/lib/auth.ts) — correct them there if yours differ.
+
+| Table | Columns this app uses |
+| --- | --- |
+| `gab_client_invites` | `code`, `client_id`, and a "spent" marker |
+| `gab_user_clients` | `user_id` (auth uuid), `client_id` |
+
+The "spent" marker is **detected at runtime** rather than assumed, because both common
+conventions exist. A boolean (`used`, `is_used`, `redeemed`, `is_redeemed`) or a nullable
+timestamp (`used_at`, `redeemed_at`, `claimed_at`, `used_on`) all work, and `used_by` /
+`redeemed_by` are populated only if the table actually has them. If none of those columns
+exist the invite still grants access, but nothing marks it spent — so it stays reusable.
+
+Minimum policies:
+
+```sql
+-- A user may read their own link row (this is how the app resolves client_id).
+create policy "read own client link" on gab_user_clients
+  for select using (user_id = auth.uid());
+
+-- A user may create their own link row during redemption.
+create policy "create own client link" on gab_user_clients
+  for insert with check (user_id = auth.uid());
+
+-- Authenticated users may read and spend invite codes.
+create policy "read invites" on gab_client_invites
+  for select to authenticated using (true);
+create policy "spend invites" on gab_client_invites
+  for update to authenticated using (used = false);
+
+-- Leads and activity are scoped by client membership.
+create policy "leads for my client" on gab_leads
+  for select using (
+    client_id in (select client_id from gab_user_clients where user_id = auth.uid())
+  );
+```
+
+### Security note — read this before going live
+
+**Invite redemption runs in the browser, under the user's own JWT, because that is what the
+requested flow implies.** That puts a hard ceiling on what it can guarantee. For the flow to
+work at all, an authenticated user must be able to `insert` into `gab_user_clients` and
+`update` `gab_client_invites` — and anyone who can do that from the app can do it from a
+console, inserting a row for **any** `client_id` and reading that tenant's leads. No amount
+of client-side care closes that hole; the checks in `redeemInvite` are honest about being
+usability guarantees, not security ones.
+
+What the code does do is remove the check-then-act race: the invite is validated first (so
+the error can distinguish "not recognised" from "already used"), but it is *claimed* with a
+single conditional `UPDATE` that only matches while the invite is unspent. If that update
+matches zero rows, someone else won the race and the link row inserted a moment earlier is
+deleted again.
+
+The durable fix is to move redemption server-side and drop the direct write policies:
+
+```sql
+create or replace function redeem_invite(p_code text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_client_id text;
+begin
+  update gab_client_invites
+     set used = true, used_by = auth.uid(), used_at = now()
+   where code = p_code and used = false
+  returning client_id into v_client_id;
+
+  if v_client_id is null then
+    raise exception 'invalid_or_used_invite';
+  end if;
+
+  insert into gab_user_clients (user_id, client_id)
+  values (auth.uid(), v_client_id)
+  on conflict do nothing;
+
+  return v_client_id;
+end;
+$$;
+```
+
+With that in place, `redeemInvite` becomes a single `supabase.rpc('redeem_invite', { p_code })`
+call, and `gab_user_clients` needs no insert policy at all. **I have not made that change,
+because it is a database migration rather than app code and you did not ask for one.**
+
 ### What the app expects from the database
 
 * `gab_leads` — readable, and updatable on `stage`, `connection_status`, `review_status`.
   Those three are the only columns this app ever writes.
 * `gab_activity` — readable, filtered by `linkedin_url` (plus `client_id` when the lead has
   one, since `linkedin_url` is only unique per client).
+* `gab_client_invites`, `gab_user_clients` — touched only during sign up and sign in, to
+  resolve which client an account belongs to.
 * `gab_users`, `gab_clients`, `gab_frameworks`, `gab_invite_log` — never touched. They hold
   licence keys and are deliberately locked.
 
@@ -147,6 +269,8 @@ panel or the word "undefined".
 | "Leads created over time" | `created_at` | Rows with no usable timestamp are excluded; the card says so when none are usable |
 | Stage everywhere | `stage` | Treated as `New Lead`, matching the column default |
 | Sorting | any nullable column | Missing values sort **last in both directions** — they are not treated as the lowest value |
+| Sign in → client resolution | the user's row in `gab_user_clients` | No row is a distinct state from a failed query: no row shows the "Link your account" screen, a failed query shows the real Supabase error |
+| Every screen, signed out | — | Redirected to Login. No dashboard content renders, and no lead query is issued |
 
 ---
 
@@ -176,7 +300,10 @@ src/
     supabase.ts         client + the error-to-message mapping (RLS hints live here)
     format.ts           initials, dates, fit bands, pill colours
     csv.ts              export of the current filtered set
-  data/LeadsProvider.tsx   one fetch, shared by every screen; optimistic writes with rollback
+    auth.ts             invite redemption, auth error messages, the table/column assumptions
+  data/
+    AuthProvider.tsx    session, client_id, sign in / sign up / sign out
+    LeadsProvider.tsx   one fetch, shared by every screen; optimistic writes with rollback
   components/
     charts.tsx          hand-rolled SVG charts, one accent hue, each with a table view
     modal/              the lead detail modal and its four tabs

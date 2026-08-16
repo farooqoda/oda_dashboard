@@ -17,7 +17,13 @@ export const supabaseUrl = url ?? null;
 export const supabase: SupabaseClient | null = supabaseConfigError
   ? null
   : createClient(url as string, anonKey as string, {
-      auth: { persistSession: false },
+      auth: {
+        // The session is the app's identity now: it must survive a reload, and
+        // it must be refreshed in the background or long sessions 401 mid-use.
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
     });
 
 /** Shape of the error surfaced to the UI: the real message, plus a hint. */

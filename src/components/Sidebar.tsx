@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
 import { outreachQueue, repliedCount } from '../lib/selectors';
 
@@ -27,8 +29,16 @@ function Count({ label, value, loading }: { label: string; value: number; loadin
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { leads, loading } = useLeads();
+  const { user, signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
   const pending = outreachQueue(leads).length;
   const replied = repliedCount(leads);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    await signOut();
+    // No reset on success: signing out unmounts this component via the guard.
+  };
 
   return (
     <div className="flex h-full flex-col border-r border-slate-200 bg-white">
@@ -61,6 +71,22 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <Count label="Total leads" value={leads.length} loading={loading} />
         <Count label="Pending outreach" value={pending} loading={loading} />
         <Count label="Replied or further" value={replied} loading={loading} />
+      </div>
+
+      <div className="border-t border-slate-200 px-5 py-3">
+        {user?.email ? (
+          <p className="truncate text-xs text-slate-600" title={user.email}>
+            {user.email}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          onClick={() => void handleSignOut()}
+          disabled={signingOut}
+        >
+          {signingOut ? 'Signing out…' : 'Log out'}
+        </button>
       </div>
     </div>
   );

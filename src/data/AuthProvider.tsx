@@ -1,0 +1,294 @@
+import type { Session, User } from '@supabase/supabase-js';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  clearPendingInvite,
+  fetchClientId,
+  redeemInvite,
+  storePendingInvite,
+  takePendingInvite,
+  toAuthError,
+} from '../lib/auth';
+import { supabase, supabaseConfigError, type FriendlyError } from '../lib/supabase';
+
+export type AuthStatus =
+  /** Restoring a persisted session — nothing may render yet. */
+  | 'loading'
+  /** No session: only Login and Sign up are reachable. */
+  | 'signed-out'
+  /** Signed in, but not linked to any client yet. */
+  | 'unlinked'
+  /** Signed in and linked — the dashboard is allowed to render. */
+  | 'ready';
+
+interface AuthContextValue {
+  status: AuthStatus;
+  session: Session | null;
+  user: User | null;
+  /** The tenant this user belongs to. Never used as a query filter — RLS does that. */
+  clientId: string | null;
+  /** A failure while reading gab_user_clients, as opposed to simply having no row. */
+  linkError: FriendlyError | null;
+  signIn: (email: string, password: string) => Promise<FriendlyError | null>;
+  signUp: (
+    email: string,
+    password: string,
+    inviteCode: string,
+  ) => Promise<{ error: FriendlyError | null; needsEmailConfirmation: boolean }>;
+  signOut: () => Promise<void>;
+  /** Redeem a code for the already-signed-in user (the unlinked-account screen). */
+  linkWithInvite: (inviteCode: string) => Promise<FriendlyError | null>;
+  refreshLink: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+const CONFIG_ERROR: FriendlyError = {
+  message: supabaseConfigError ?? 'Supabase is not configured.',
+  hint: null,
+  code: 'CONFIG',
+};
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<FriendlyError | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [linkChecked, setLinkChecked] = useState(false);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  // Restore any persisted session, then track every change (sign in, sign out,
+  // token refresh, and the other-tab case).
+  useEffect(() => {
+    if (!supabase) {
+      setAuthReady(true);
+      setLinkChecked(true);
+      return;
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted.current) return;
+      setSession(data.session ?? null);
+      setAuthReady(true);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (!mounted.current) return;
+      setSession(next);
+      setAuthReady(true);
+      if (!next) {
+        setClientId(null);
+        setLinkError(null);
+        setLinkChecked(true);
+      } else {
+        setLinkChecked(false);
+      }
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const userId = session?.user?.id ?? null;
+
+  /**
+   * Resolve the user's client. If they arrived from a signup that could not
+   * complete (email confirmation on), a parked invite code is redeemed here on
+   * their first authenticated load.
+   */
+  const resolveLink = useCallback(async () => {
+    if (!supabase || !userId) {
+      setLinkChecked(true);
+      return;
+    }
+
+    const { clientId: found, error } = await fetchClientId(supabase, userId);
+    if (!mounted.current) return;
+
+    if (error) {
+      setLinkError(error);
+      setClientId(null);
+      setLinkChecked(true);
+      return;
+    }
+
+    if (found) {
+      clearPendingInvite();
+      setClientId(found);
+      setLinkError(null);
+      setLinkChecked(true);
+      return;
+    }
+
+    const pending = takePendingInvite();
+    if (pending) {
+      const result = await redeemInvite(supabase, pending, userId);
+      if (!mounted.current) return;
+      if (result.clientId) {
+        setClientId(result.clientId);
+        setLinkError(null);
+        setLinkChecked(true);
+        return;
+      }
+      // Surface why the parked code failed instead of silently dropping it.
+      setLinkError(result.error);
+    }
+
+    setClientId(null);
+    setLinkChecked(true);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (!userId) {
+      setLinkChecked(true);
+      return;
+    }
+    if (linkChecked) return;
+    void resolveLink();
+  }, [authReady, userId, linkChecked, resolveLink]);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    if (!supabase) return CONFIG_ERROR;
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    return error ? toAuthError(error) : null;
+  }, []);
+
+  const signUp = useCallback(
+    async (email: string, password: string, inviteCode: string) => {
+      if (!supabase) return { error: CONFIG_ERROR, needsEmailConfirmation: false };
+
+      const code = inviteCode.trim();
+      if (!code) {
+        return {
+          error: { message: 'Enter the invite code you were given.', hint: null, code: 'INVITE_MISSING' },
+          needsEmailConfirmation: false,
+        };
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      });
+      if (error) return { error: toAuthError(error), needsEmailConfirmation: false };
+
+      const newUser = data.user;
+      if (!newUser) {
+        return {
+          error: {
+            message: 'Sign up did not return a user account.',
+            hint: 'Check the Authentication settings for this Supabase project.',
+            code: null,
+          },
+          needsEmailConfirmation: false,
+        };
+      }
+
+      // With email confirmation on, signUp returns a user but no session — so
+      // there is no JWT to write with yet. Park the code and redeem it on the
+      // first real sign-in rather than failing the signup.
+      if (!data.session) {
+        storePendingInvite(code);
+        return { error: null, needsEmailConfirmation: true };
+      }
+
+      const result = await redeemInvite(supabase, code, newUser.id);
+      if (result.error) {
+        // The account exists but is unlinked. Keep the code so the
+        // unlinked-account screen can explain and let them retry.
+        return { error: result.error, needsEmailConfirmation: false };
+      }
+
+      if (mounted.current) {
+        setClientId(result.clientId);
+        setLinkError(null);
+        setLinkChecked(true);
+      }
+      return { error: null, needsEmailConfirmation: false };
+    },
+    [],
+  );
+
+  const linkWithInvite = useCallback(
+    async (inviteCode: string) => {
+      if (!supabase) return CONFIG_ERROR;
+      if (!userId) {
+        return { message: 'You are not signed in.', hint: null, code: 'NO_SESSION' };
+      }
+      const result = await redeemInvite(supabase, inviteCode, userId);
+      if (result.error) return result.error;
+      if (mounted.current) {
+        setClientId(result.clientId);
+        setLinkError(null);
+        setLinkChecked(true);
+      }
+      return null;
+    },
+    [userId],
+  );
+
+  const signOut = useCallback(async () => {
+    clearPendingInvite();
+    if (supabase) await supabase.auth.signOut();
+    if (!mounted.current) return;
+    setSession(null);
+    setClientId(null);
+    setLinkError(null);
+    setLinkChecked(true);
+  }, []);
+
+  const refreshLink = useCallback(async () => {
+    setLinkChecked(false);
+  }, []);
+
+  const status: AuthStatus = !authReady
+    ? 'loading'
+    : !session
+      ? 'signed-out'
+      : !linkChecked
+        ? 'loading'
+        : clientId
+          ? 'ready'
+          : 'unlinked';
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      status,
+      session,
+      user: session?.user ?? null,
+      clientId,
+      linkError,
+      signIn,
+      signUp,
+      signOut,
+      linkWithInvite,
+      refreshLink,
+    }),
+    [status, session, clientId, linkError, signIn, signUp, signOut, linkWithInvite, refreshLink],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
+  return ctx;
+}
