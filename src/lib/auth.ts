@@ -320,6 +320,8 @@ export async function fetchClientLink(
 export const USERS_TABLE = 'gab_users';
 export const LICENSE_KEY_COLUMN = 'license_key';
 
+export const EMAIL_COLUMN = 'email';
+
 export type LicenseKeyOutcome =
   /** Found it. */
   | { state: 'found'; licenseKey: string }
@@ -330,35 +332,55 @@ export type LicenseKeyOutcome =
   /** The read failed, usually because RLS does not expose the row. */
   | { state: 'error'; error: FriendlyError };
 
+export interface AccountRecord {
+  licenseKey: LicenseKeyOutcome;
+  /**
+   * The email recorded on the account row, which is NOT the same thing as the
+   * email on the auth session: rows created before the column existed have
+   * none. Null means "not set", never "failed to read".
+   */
+  email: string | null;
+}
+
 /**
- * Reads the signed-in user's own licence key.
+ * Reads the signed-in user's own row from gab_users — their licence key and
+ * the email recorded alongside it. RLS scopes this to `user_id = auth.uid()`,
+ * so there is no other row it could return.
  *
  * The row is generated for them server-side, which may not have happened by
  * the instant signUp resolves, so a missing row is retried briefly with
  * backoff before being reported as missing. An RLS refusal is NOT retried —
  * it will not fix itself, and retrying only delays the message.
+ *
+ * The whole row is selected rather than named columns, because a deployment
+ * whose gab_users predates the email column would otherwise fail the entire
+ * query — including the licence key, which does exist — on the missing name.
  */
-export async function fetchLicenseKey(
+export async function fetchAccountRecord(
   client: SupabaseClient,
   userId: string,
   attempts = 4,
-): Promise<LicenseKeyOutcome> {
+): Promise<AccountRecord> {
   let delay = 400;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const { data, error } = await client
       .from(USERS_TABLE)
-      .select(LICENSE_KEY_COLUMN)
+      .select('*')
       .eq(AUTH_COLUMNS.userId, userId)
       .limit(1);
 
-    if (error) return { state: 'error', error: toFriendlyError(error) };
+    if (error) return { licenseKey: { state: 'error', error: toFriendlyError(error) }, email: null };
 
     const row = (data ?? [])[0] as Record<string, unknown> | undefined;
     if (row) {
+      const rawEmail = row[EMAIL_COLUMN];
+      const email = typeof rawEmail === 'string' && rawEmail.trim() ? rawEmail.trim() : null;
       const key = row[LICENSE_KEY_COLUMN];
-      if (typeof key === 'string' && key.trim()) return { state: 'found', licenseKey: key.trim() };
-      return { state: 'empty' };
+      if (typeof key === 'string' && key.trim()) {
+        return { licenseKey: { state: 'found', licenseKey: key.trim() }, email };
+      }
+      return { licenseKey: { state: 'empty' }, email };
     }
 
     if (attempt < attempts - 1) {
@@ -367,7 +389,17 @@ export async function fetchLicenseKey(
     }
   }
 
-  return { state: 'missing' };
+  return { licenseKey: { state: 'missing' }, email: null };
+}
+
+/** The licence key on its own, for callers that do not need the rest. */
+export async function fetchLicenseKey(
+  client: SupabaseClient,
+  userId: string,
+  attempts = 4,
+): Promise<LicenseKeyOutcome> {
+  const { licenseKey } = await fetchAccountRecord(client, userId, attempts);
+  return licenseKey;
 }
 
 // ---------------------------------------------------------------------------

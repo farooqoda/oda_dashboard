@@ -1,5 +1,10 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLeads } from '../../data/LeadsProvider';
+import { useAuth } from '../../data/AuthProvider';
 import { CONNECTION_STATUSES, INVITE_CHAR_LIMIT, REVIEW_STATUSES } from '../../lib/constants';
+import { requestReplyDraft } from '../../lib/draftReply';
 import { traitBool, traitString } from '../../lib/traitsRegistry';
+import type { FriendlyError } from '../../lib/supabase';
 import type { Lead, LeadPatch } from '../../lib/types';
 import { CopyButton } from '../ui';
 
@@ -104,6 +109,226 @@ function StatusSelect({
   );
 }
 
+/**
+ * CONVERSATION HISTORY AND THE DRAFTED REPLY
+ * ==========================================
+ * The user pastes the LinkedIn thread here, because LinkedIn cannot be read
+ * from this app. The text is kept on `gab_leads.conversation_history` so it
+ * survives closing the modal, and the drafted reply is kept on
+ * `gab_leads.reply_draft` so a draft made yesterday is still here today.
+ *
+ * Typing is never thrown away: the textarea saves on blur, there is an
+ * explicit Save for people who prefer one, and drafting saves first. A
+ * remote change to the row only overwrites the box when the user has no
+ * unsaved edits in it.
+ */
+function ConversationSection({ lead }: { lead: Lead }) {
+  const { updateLead } = useLeads();
+  const { clientId } = useAuth();
+
+  const [text, setText] = useState(lead.conversation_history ?? '');
+  /** The value currently believed to be in the database. */
+  const savedRef = useRef(lead.conversation_history ?? '');
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<FriendlyError | null>(null);
+
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState<FriendlyError | null>(null);
+  const [draftWarning, setDraftWarning] = useState<string | null>(null);
+  const [fresh, setFresh] = useState<string | null>(null);
+
+  // A different lead: start over from that row's stored values.
+  useEffect(() => {
+    setText(lead.conversation_history ?? '');
+    savedRef.current = lead.conversation_history ?? '';
+    savingRef.current = false;
+    setSaving(false);
+    setSaveError(null);
+    setDrafting(false);
+    setDraftError(null);
+    setDraftWarning(null);
+    setFresh(null);
+  }, [lead.id]);
+
+  // The row changed underneath us (another tab, or the drafting workflow
+  // writing back). Adopt it only if there is nothing unsaved to lose.
+  //
+  // A save in flight is skipped entirely: `updateLead` is optimistic, so the
+  // row swings to the new value and — if the write fails — back again, and
+  // following it here would rewrite the textarea from under the user and lose
+  // the very text the save was trying to keep.
+  useEffect(() => {
+    if (savingRef.current) return;
+    const incoming = lead.conversation_history ?? '';
+    if (incoming === savedRef.current) return;
+    const clean = text === savedRef.current;
+    savedRef.current = incoming;
+    if (clean) setText(incoming);
+  }, [lead.conversation_history, text]);
+
+  const dirty = text !== savedRef.current;
+
+  const persist = useCallback(
+    async (value: string): Promise<boolean> => {
+      if (value === savedRef.current) return true;
+      savingRef.current = true;
+      setSaving(true);
+      setSaveError(null);
+      const error = await updateLead(lead.id, { conversation_history: value.trim() ? value : null });
+      // Only after the write is settled: on failure the row has been rolled
+      // back, so what is stored is still whatever was there before.
+      savedRef.current = error ? savedRef.current : value;
+      savingRef.current = false;
+      setSaving(false);
+      if (error) {
+        setSaveError(error);
+        return false;
+      }
+      return true;
+    },
+    [lead.id, updateLead],
+  );
+
+  const draftReply = async () => {
+    const conversation = text.trim();
+    setDraftError(null);
+    setDraftWarning(null);
+
+    if (!conversation) {
+      setDraftError({
+        message: 'Paste the conversation first.',
+        hint: 'The draft is written from what both sides have already said.',
+        code: 'NO_CONVERSATION',
+      });
+      return;
+    }
+
+    setDrafting(true);
+    // Save before calling out, so a failed or slow draft never costs the text.
+    await persist(text);
+
+    const { reply, error } = await requestReplyDraft({
+      leadId: lead.id,
+      clientId: clientId ?? lead.client_id,
+      conversationText: conversation,
+    });
+
+    if (error || !reply) {
+      setDraftError(
+        error ?? { message: 'The drafting service sent no reply back.', hint: null, code: 'DRAFT_REPLY' },
+      );
+      setDrafting(false);
+      return;
+    }
+
+    setFresh(reply);
+
+    // Keep it on the row. The workflow may write this itself; setting it here
+    // too means the draft is still on screen next session either way.
+    const writeError = await updateLead(lead.id, { reply_draft: reply });
+    if (writeError) {
+      setDraftWarning(
+        `The draft below could not be saved to this lead — copy it now if you want to keep it. ${writeError.message}`,
+      );
+    }
+    setDrafting(false);
+  };
+
+  const stored = lead.reply_draft?.trim() ?? '';
+  const shown = fresh ?? (stored || null);
+
+  return (
+    <section className="border-t border-slate-200 pt-5">
+      <h3 className="text-sm font-semibold text-slate-900">Conversation and reply</h3>
+      <p className="mt-1 text-xs text-slate-600">
+        This dashboard cannot read LinkedIn. Paste the thread here and a reply is drafted from
+        it — you still send it yourself.
+      </p>
+
+      <label className="mt-4 block">
+        <span className="label">Paste the LinkedIn conversation (both sides)</span>
+        <textarea
+          className="input mt-1 min-h-[9rem] font-normal"
+          value={text}
+          placeholder={'Them: Thanks for connecting…\nYou: Glad to be connected…'}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => void persist(text)}
+        />
+      </label>
+
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => void persist(text)}
+          disabled={saving || !dirty}
+        >
+          {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
+        </button>
+
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => void draftReply()}
+          disabled={drafting || !text.trim()}
+        >
+          {drafting ? 'Drafting…' : 'Draft Reply'}
+        </button>
+
+        <span className="text-xs text-slate-500">
+          {dirty ? 'Unsaved changes — saved when you click away.' : 'Saved to this lead.'}
+        </span>
+      </div>
+
+      {saveError ? (
+        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+          <p className="font-medium">The conversation could not be saved.</p>
+          <p className="mt-1 break-words font-mono">{saveError.message}</p>
+          {saveError.hint ? <p className="mt-1">{saveError.hint}</p> : null}
+        </div>
+      ) : null}
+
+      {draftError ? (
+        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+          <p className="font-medium">{draftError.message}</p>
+          {draftError.hint ? <p className="mt-1 break-words">{draftError.hint}</p> : null}
+        </div>
+      ) : null}
+
+      {draftWarning ? (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {draftWarning}
+        </div>
+      ) : null}
+
+      <div className="mt-4">
+        {drafting && !shown ? (
+          <div className="card p-4">
+            <div className="skeleton h-3 w-40" />
+            <div className="skeleton mt-3 h-3 w-full" />
+            <div className="skeleton mt-2 h-3 w-5/6" />
+          </div>
+        ) : shown ? (
+          <MessageCard
+            title="Drafted reply"
+            subtitle={
+              fresh
+                ? 'Drafted just now from the conversation above.'
+                : 'Drafted earlier and saved to this lead.'
+            }
+            body={shown}
+          />
+        ) : (
+          <p className="rounded-md border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-500">
+            No reply has been drafted for this lead yet.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function OutreachTab({
   lead,
   onPatch,
@@ -120,7 +345,7 @@ export function OutreachTab({
   const responseNeeded = traitBool(lead.traits, 'response_needed');
   const responseReason = traitString(lead.traits, 'response_reason');
 
-  const hasAnyMessage = !!invite || !!inmailMessage || !!replyDraft;
+  const hasAnyMessage = !!invite || !!inmailMessage || !!replyDraft || !!lead.reply_draft?.trim();
 
   return (
     <div className="space-y-6">
@@ -166,6 +391,8 @@ export function OutreachTab({
           </div>
         </div>
       ) : null}
+
+      <ConversationSection lead={lead} />
 
       <section className="border-t border-slate-200 pt-5">
         <h3 className="mb-3 text-sm font-semibold text-slate-900">Status</h3>

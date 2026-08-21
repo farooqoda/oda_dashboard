@@ -20,6 +20,10 @@ export interface Lead {
   location: string | null;
   traits: TraitsRecord | null;
   invite_message: string | null;
+  /** The LinkedIn thread, pasted in by the user, that a reply is drafted from. */
+  conversation_history: string | null;
+  /** The last reply drafted for this lead, written back by the draft webhook. */
+  reply_draft: string | null;
   stage: string | null;
   connection_status: string | null;
   review_status: string | null;
@@ -40,5 +44,8 @@ export interface Activity {
 
 /** The subset of columns this app is allowed to write back. */
 export type LeadPatch = Partial<
-  Pick<Lead, 'stage' | 'connection_status' | 'review_status'>
+  Pick<
+    Lead,
+    'stage' | 'connection_status' | 'review_status' | 'conversation_history' | 'reply_draft'
+  >
 >;

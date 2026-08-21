@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Card, PageHeader } from '../components/ui';
+import { Card, CopyButton, PageHeader } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
+import { fetchAccountRecord, type AccountRecord } from '../lib/auth';
 import { MAX_ROWS, SUPPORT_EMAIL } from '../lib/constants';
 import { supabase } from '../lib/supabase';
 
@@ -9,7 +10,9 @@ import { supabase } from '../lib/supabase';
  * Deliberately free of backend branding: no vendor name, no project URL, no
  * hostname, no mention of the database engine or of API keys. Everything here
  * is scoped to the signed-in user by Row Level Security, so "your account" is
- * literally what the numbers describe.
+ * literally what the numbers describe — including the licence key, which is
+ * read from the user's own gab_users row (user_id = auth.uid()) and shown here
+ * so it can be recovered after the one-time Setup complete screen has gone.
  *
  * This is also the one screen that does NOT surface raw query errors. Every
  * other screen still shows the real message, because those are working
@@ -49,6 +52,72 @@ function useAccountLeadCount() {
   return { count, failed, loading };
 }
 
+/** The signed-in user's own gab_users row: licence key and recorded email. */
+function useAccountRecord(userId: string | null | undefined) {
+  const [record, setRecord] = useState<AccountRecord | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    let cancelled = false;
+    // Two attempts, not four: on Settings the row either exists or the user
+    // needs to hear so, and a long backoff is just a stalled panel.
+    void fetchAccountRecord(supabase, userId, 2).then((result) => {
+      if (!cancelled) setRecord(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  return record;
+}
+
+/**
+ * Same treatment as the Setup complete screen: a selectable monospace block
+ * with a Copy button, and an explanation of which of the user's two
+ * credentials this one is.
+ */
+function LicenseKeyBlock({ record }: { record: AccountRecord | null }) {
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <h3 className="text-sm font-semibold text-slate-900">Your LinkedIn extension key</h3>
+
+      {record === null ? (
+        <div className="mt-2">
+          <div className="skeleton h-10 w-full" />
+        </div>
+      ) : record.licenseKey.state === 'found' ? (
+        <>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="min-w-0 flex-1 select-all break-all rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-900">
+              {record.licenseKey.licenseKey}
+            </code>
+            <CopyButton text={record.licenseKey.licenseKey} className="btn-secondary shrink-0" />
+          </div>
+          <p className="mt-2 text-xs text-slate-600">
+            Paste this as your password when the LinkedIn extension asks you to log in, using the
+            email on your account. It is not the password you signed in here with.
+          </p>
+        </>
+      ) : (
+        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {record.licenseKey.state === 'missing'
+            ? 'No key has been generated for your account yet.'
+            : record.licenseKey.state === 'empty'
+              ? 'Your account record exists, but no key has been set on it.'
+              : 'Your key could not be read just now.'}{' '}
+          Ask{' '}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="underline underline-offset-2">
+            {SUPPORT_EMAIL}
+          </a>{' '}
+          to send it to you. The dashboard works normally without it — it is only needed by the
+          LinkedIn extension.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
@@ -62,6 +131,7 @@ export function SettingsPage() {
   const { error: leadsError } = useLeads();
   const { user, clientId, clientName, signOut } = useAuth();
   const { count, failed, loading } = useAccountLeadCount();
+  const record = useAccountRecord(user?.id);
   const [signingOut, setSigningOut] = useState(false);
 
   const connected = !leadsError && !failed;
@@ -79,6 +149,16 @@ export function SettingsPage() {
         <Card title="Your account">
           <div className="divide-y divide-slate-100">
             <Row label="Signed in as" value={user?.email ?? 'Not signed in'} />
+            <Row
+              label="Email on your account"
+              value={
+                record === null ? (
+                  <span className="skeleton inline-block h-3 w-32 align-middle" />
+                ) : (
+                  record.email ?? 'Not set'
+                )
+              }
+            />
             <Row label="Client" value={clientName ?? clientId ?? 'Not linked to a client'} />
             <Row
               label="Total leads in your account"
@@ -101,6 +181,8 @@ export function SettingsPage() {
               {count.toLocaleString()}.
             </p>
           ) : null}
+
+          <LicenseKeyBlock record={record} />
 
           <button
             type="button"

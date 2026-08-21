@@ -76,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [linkChecked, setLinkChecked] = useState(false);
   const mounted = useRef(true);
+  /** The user the current view belongs to — see the auth listener below. */
+  const knownUserId = useRef<string | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -86,6 +88,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore any persisted session, then track every change (sign in, sign out,
   // token refresh, and the other-tab case).
+  //
+  // `autoRefreshToken` fires an auth event roughly once an hour, and again
+  // whenever the tab regains focus. Those carry the SAME user with a fresh JWT
+  // — treating them as a new sign-in re-ran the client lookup, which pushed
+  // `status` back to 'loading', which unmounted everything behind the gate
+  // (LeadsProvider included) and flashed the boot screen. So the identity of
+  // the user, not the arrival of an event, is what invalidates the link.
   useEffect(() => {
     if (!supabase) {
       setAuthReady(true);
@@ -95,15 +104,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void supabase.auth.getSession().then(({ data }) => {
       if (!mounted.current) return;
-      setSession(data.session ?? null);
+      const restored = data.session ?? null;
+      setSession(restored);
+      if (restored?.user?.id) knownUserId.current = restored.user.id;
       setAuthReady(true);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!mounted.current) return;
+      const nextUserId = next?.user?.id ?? null;
+      const sameUser = nextUserId !== null && nextUserId === knownUserId.current;
+
       setSession(next);
       setAuthReady(true);
-      if (!next) {
+
+      // A token refresh, a user-metadata update, or a duplicate SIGNED_IN for
+      // the account already on screen: keep the view exactly as it is.
+      if (sameUser) return;
+
+      knownUserId.current = nextUserId;
+      if (!nextUserId) {
         setClientId(null);
         setClientName(null);
         setSetupCompleted(false);
@@ -267,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     clearPendingInvite();
     if (supabase) await supabase.auth.signOut();
+    knownUserId.current = null;
     if (!mounted.current) return;
     setSession(null);
     setClientId(null);
@@ -282,14 +303,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLinkChecked(false);
   }, []);
 
+  /**
+   * Order matters: a known `clientId` wins over an in-flight link check, so a
+   * background re-check (`refreshLink`) never drops a working dashboard back to
+   * the loading gate. 'loading' is only for the states where there genuinely is
+   * nothing to show yet.
+   */
   const status: AuthStatus = !authReady
     ? 'loading'
     : !session
       ? 'signed-out'
-      : !linkChecked
-        ? 'loading'
-        : clientId
-          ? 'ready'
+      : clientId
+        ? 'ready'
+        : !linkChecked
+          ? 'loading'
           : 'unlinked';
 
   const value = useMemo<AuthContextValue>(
