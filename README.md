@@ -393,6 +393,21 @@ these to different places, and keying the display off only one of them meant an 
 existed did not render. `messageText()` in
 [`OutreachTab.tsx`](src/components/modal/OutreachTab.tsx) is the single place that decides.
 
+Those three cards still read fixed key names, and that is precisely how a lead could sit on
+the Outreach tab saying "no messages have been generated" while the pipeline had written one
+under a name this app had never been told about. So **any other message-shaped value on the
+row is discovered, not declared**: `discoverMessages()` walks the columns and the traits,
+takes every string whose key reads like a message (`message`, `inmail`, `invite`, `outreach`,
+`reply`, `draft`, `note`, `pitch`) and is not an identity, status or bookkeeping field, and
+renders it in the same card as the rest — with its `*_subject` sibling as the subtitle, and
+the 300-character connection-note limit applied when the name says invite. A body that
+appears in both a column and `traits` is shown once.
+
+When nothing is found, the empty state lists **the fields the row does carry**, names and
+sizes only, never values. "No messages have been generated yet" is a dead end when the
+message demonstrably exists in the database; the field list is either where it actually
+landed or proof that it never arrived.
+
 ## What this app deliberately does not do
 
 * **No sending, sequences, campaigns, scheduling or reply tracking.** Nothing in `gab_leads`

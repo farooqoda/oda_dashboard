@@ -3,7 +3,7 @@ import { useLeads } from '../../data/LeadsProvider';
 import { useAuth } from '../../data/AuthProvider';
 import { CONNECTION_STATUSES, INVITE_CHAR_LIMIT, REVIEW_STATUSES } from '../../lib/constants';
 import { requestReplyDraft } from '../../lib/draftReply';
-import { traitBool, traitString } from '../../lib/traitsRegistry';
+import { prettifyKey, traitBool, traitString } from '../../lib/traitsRegistry';
 import type { FriendlyError } from '../../lib/supabase';
 import type { Lead, LeadPatch } from '../../lib/types';
 import { CopyButton } from '../ui';
@@ -42,6 +42,121 @@ function columnString(lead: Lead, key: string): string | null {
 
 function messageText(lead: Lead, key: string): string | null {
   return columnString(lead, key) ?? traitString(lead.traits, key);
+}
+
+// ---------------------------------------------------------------------------
+// Finding the messages
+// ---------------------------------------------------------------------------
+//
+// The three cards above read fixed key names, and that is exactly why a lead
+// could sit here saying "no messages have been generated" while the pipeline
+// had written one under a name this file did not know. Frameworks are added in
+// the database without anyone touching this app — the same premise the traits
+// registry is built on — so the tab must not depend on guessing their key
+// names right.
+//
+// Anything else on the row that looks like a generated message is therefore
+// discovered rather than declared, from the columns AND from `traits`, and
+// rendered in the same card as the rest.
+
+/** Row fields that are never an outreach message, whatever they are called. */
+const NOT_A_MESSAGE = new Set([
+  'id',
+  'client_id',
+  'user_id',
+  'contact_id',
+  'linkedin_url',
+  'full_name',
+  'title',
+  'company',
+  'email',
+  'phone',
+  'location',
+  'stage',
+  'connection_status',
+  'review_status',
+  'created_at',
+  'updated_at',
+  'traits',
+  // The user's own pasted thread, which has its own box, and the raw profile
+  // scrape, which is prose about the person rather than a message to them.
+  'conversation_history',
+  'profile_text',
+]);
+
+/** A key that names a message rather than an attribute. */
+const MESSAGE_NAME = /message|inmail|invite|outreach|reply|draft|note|pitch|blurb|copy$/i;
+
+interface FoundMessage {
+  key: string;
+  label: string;
+  subject: string | null;
+  body: string;
+  limit?: number;
+}
+
+/** `linkedin_inmail_message` -> the value of `linkedin_inmail_subject`, if any. */
+function siblingSubject(lead: Lead, key: string): string | null {
+  const stem = key.replace(/_?(message|body|text|draft|copy)$/i, '');
+  if (!stem || stem === key) return null;
+  return messageText(lead, `${stem}_subject`);
+}
+
+/**
+ * Every message-shaped value on the row that is not already on screen.
+ * Columns first, then traits; identical bodies are shown once, because a
+ * pipeline that writes to both would otherwise render the message twice.
+ */
+function discoverMessages(lead: Lead, shownKeys: Set<string>, shownBodies: Set<string>): FoundMessage[] {
+  const fields: Array<[string, unknown]> = [
+    ...Object.entries(lead as unknown as Record<string, unknown>),
+    ...Object.entries(lead.traits ?? {}),
+  ];
+
+  const seen = new Set(shownBodies);
+  const found: FoundMessage[] = [];
+
+  for (const [key, value] of fields) {
+    if (shownKeys.has(key) || NOT_A_MESSAGE.has(key)) continue;
+    if (typeof value !== 'string') continue;
+    // A subject line is a subtitle on its message, never a card of its own.
+    if (/subject$/i.test(key)) continue;
+    if (!MESSAGE_NAME.test(key)) continue;
+
+    const body = value.trim();
+    if (!body || seen.has(body)) continue;
+    seen.add(body);
+
+    found.push({
+      key,
+      label: prettifyKey(key),
+      subject: siblingSubject(lead, key),
+      body,
+      // Anything sent as a connection note is bound by the same 300 characters.
+      limit: /invite|connection/i.test(key) ? INVITE_CHAR_LIMIT : undefined,
+    });
+  }
+
+  return found;
+}
+
+/**
+ * What the row actually carries, for when nothing message-shaped was found.
+ * Names and sizes only, never values: enough to see where a message landed —
+ * or that it never arrived — without printing someone's profile into the page.
+ */
+function describeRow(lead: Lead): string[] {
+  const describe = (entries: Array<[string, unknown]>) =>
+    entries
+      .filter(([key, value]) => !NOT_A_MESSAGE.has(key) && value !== null && value !== undefined && value !== '')
+      .map(([key, value]) =>
+        typeof value === 'string' ? `${key} (${value.trim().length} chars)` : `${key} (${typeof value})`,
+      );
+
+  return [
+    ...describe(Object.entries(lead as unknown as Record<string, unknown>)),
+    ...describe(Object.entries(lead.traits ?? {})),
+  ].sort();
 }
 
 function MessageCard({
@@ -382,7 +497,20 @@ export function OutreachTab({
   const responseNeeded = traitBool(lead.traits, 'response_needed');
   const responseReason = traitString(lead.traits, 'response_reason');
 
-  const hasAnyMessage = !!invite || !!inmailMessage || !!pipelineReply;
+  // Everything the pipeline wrote under a name this file does not hardcode.
+  const extraMessages = discoverMessages(
+    lead,
+    new Set([
+      'invite_message',
+      'linkedin_inmail_subject',
+      'linkedin_inmail_message',
+      'reply_draft',
+      ...REPLY_KEYS,
+    ]),
+    new Set([invite, inmailMessage ?? '', pipelineReply ?? ''].filter(Boolean)),
+  );
+
+  const hasAnyMessage = !!invite || !!inmailMessage || !!pipelineReply || extraMessages.length > 0;
 
   return (
     <div className="space-y-6">
@@ -391,15 +519,7 @@ export function OutreachTab({
         dashboard never sends anything.
       </p>
 
-      {!hasAnyMessage ? (
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-6 text-center">
-          <p className="text-sm font-medium text-slate-800">No messages have been generated yet</p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
-            Neither an invite message nor an InMail draft exists on this row. Message generation
-            happens in the database pipeline.
-          </p>
-        </div>
-      ) : null}
+      {!hasAnyMessage ? <NoMessages lead={lead} /> : null}
 
       {invite ? (
         <MessageCard title="Connection invite" body={invite} limit={INVITE_CHAR_LIMIT} />
@@ -412,6 +532,16 @@ export function OutreachTab({
           body={inmailMessage}
         />
       ) : null}
+
+      {extraMessages.map((message) => (
+        <MessageCard
+          key={message.key}
+          title={message.label}
+          subtitle={message.subject ? `Subject: ${message.subject}` : null}
+          body={message.body}
+          limit={message.limit}
+        />
+      ))}
 
       <ReplySection
         lead={lead}
@@ -442,6 +572,45 @@ export function OutreachTab({
           Both write straight back to gab_leads.
         </p>
       </section>
+    </div>
+  );
+}
+
+/**
+ * Nothing message-shaped was found. "No messages have been generated yet" on
+ * its own is a dead end when the message demonstrably exists in the database,
+ * so this also names the fields the row does carry — which is either where the
+ * message actually landed, or proof that it never arrived.
+ */
+function NoMessages({ lead }: { lead: Lead }) {
+  const fields = describeRow(lead);
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-6">
+      <p className="text-center text-sm font-medium text-slate-800">
+        No messages have been generated yet
+      </p>
+      <p className="mx-auto mt-2 max-w-md text-center text-sm text-slate-600">
+        Nothing on this row looks like a generated message. Message generation happens in the
+        database pipeline.
+      </p>
+
+      {fields.length > 0 ? (
+        <details className="mx-auto mt-4 max-w-lg">
+          <summary className="cursor-pointer text-center text-xs text-slate-500 underline underline-offset-2">
+            What this row does carry ({fields.length} fields)
+          </summary>
+          <ul className="mt-2 space-y-0.5 break-words font-mono text-[11px] text-slate-600">
+            {fields.map((field) => (
+              <li key={field}>{field}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-slate-500">
+            A message stored under one of these names is shown automatically — send this list to
+            support if one of them is the message you expected to see.
+          </p>
+        </details>
+      ) : null}
     </div>
   );
 }
