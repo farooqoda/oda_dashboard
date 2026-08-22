@@ -87,6 +87,13 @@ Settings reads the same `gab_users` row (`user_id = auth.uid()`) and renders the
 same copyable block, alongside the `email` recorded on that row — which is null on older
 accounts and shows as "Not set" rather than breaking the panel.
 
+When that read comes back empty, Settings says **why**, on screen: the query it ran, the user
+id it ran it for, and either the verbatim Postgres error with its code or the fact that it
+matched no rows — plus the `gab_users` policy that would fix it. A licence key that silently
+does not appear is unsupportable, so this is the one place Settings shows a raw error. The
+read also falls back to an `id`-keyed `gab_users` if `user_id` does not exist (Postgres
+42703), because that is a schema difference rather than a missing key.
+
 ### Supabase project settings
 
 * Enable the **Email** provider under Authentication → Providers.
@@ -346,11 +353,16 @@ a failure is the point. The support address is `SUPPORT_EMAIL` in
 
 ## Drafting a reply from a conversation
 
-The Outreach tab in the lead modal has a **Conversation and reply** section. This app cannot
-read LinkedIn, so the user pastes the thread — both sides — into a textarea. It saves to
-`gab_leads.conversation_history` on blur, on an explicit **Save**, and again before drafting;
-typing is never lost by navigating away, and a change to the row from elsewhere only
-overwrites the box when there is nothing unsaved in it.
+The Outreach tab's **reply-draft area is extended, not replaced**. The box that shows a
+drafted reply — and its "no reply drafted" fallback, whose text comes from the row's
+`response_reason` — is the one that has always been there. What is new sits directly above
+it: a textarea and a Draft Reply button, whose result lands in that same box. There is
+deliberately no second reply-draft display.
+
+This app cannot read LinkedIn, so the user pastes the thread — both sides — into the
+textarea. It saves to `gab_leads.conversation_history` on blur, on an explicit **Save**, and
+again before drafting; typing is never lost by navigating away, and a change to the row from
+elsewhere only overwrites the box when there is nothing unsaved in it.
 
 **Draft Reply** POSTs to the n8n workflow at `DRAFT_REPLY_WEBHOOK`
 ([`src/lib/constants.ts`](src/lib/constants.ts)):
@@ -362,15 +374,24 @@ overwrites the box when there is nothing unsaved in it.
 { "reply_draft": "…" }
 ```
 
-The draft is shown read-only with a Copy button, in the same card as the invite and InMail
-messages, and written back to `gab_leads.reply_draft` so it is still there next session —
-that column is also read on load, so a draft the workflow made earlier shows up without
-anyone pressing anything. The response is parsed defensively: a bare object, a
+The draft is shown read-only with a Copy button, in the existing reply-draft box, and
+written back to `gab_leads.reply_draft` so it is still there next session — that value is
+also read when the modal opens, so a draft from a previous session or from the pipeline
+shows up without anyone pressing the button. The response is parsed defensively: a bare object, a
 single-element array, an `{ output }` / `{ json }` wrapper or plain text all work, because
 which one you get depends on how the workflow's final node is configured. Nothing is sent
 to LinkedIn; as everywhere else in this app, the user copies and sends by hand.
 
 This is the only outbound request the dashboard makes to anything other than Supabase.
+
+### Where a message lives
+
+The invite, the InMail subject and body, and the reply draft are read from **the column if
+there is one, and from `traits` if there is not** — `select('*')` returns whatever columns
+the table actually has, so both are checked, column first. Different pipelines have written
+these to different places, and keying the display off only one of them meant an InMail that
+existed did not render. `messageText()` in
+[`OutreachTab.tsx`](src/components/modal/OutreachTab.tsx) is the single place that decides.
 
 ## What this app deliberately does not do
 

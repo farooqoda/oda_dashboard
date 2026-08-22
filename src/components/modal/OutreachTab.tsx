@@ -26,6 +26,24 @@ function firstTrait(lead: Lead, keys: string[]): string | null {
   return null;
 }
 
+/**
+ * A message may live in a real column on gab_leads OR inside the `traits`
+ * jsonb, depending on which pipeline wrote the row — `select('*')` returns
+ * whatever columns exist, so both are checked here. Column first, traits
+ * second, so an InMail or a reply draft renders for EVERY lead that has one,
+ * wherever it was written.
+ */
+function columnString(lead: Lead, key: string): string | null {
+  const value = (lead as unknown as Record<string, unknown>)[key];
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number') return String(value);
+  return null;
+}
+
+function messageText(lead: Lead, key: string): string | null {
+  return columnString(lead, key) ?? traitString(lead.traits, key);
+}
+
 function MessageCard({
   title,
   subtitle,
@@ -110,19 +128,37 @@ function StatusSelect({
 }
 
 /**
- * CONVERSATION HISTORY AND THE DRAFTED REPLY
- * ==========================================
+ * THE REPLY SECTION
+ * =================
+ * This is the reply-draft area that has always been here, EXTENDED — not
+ * replaced. The drafted reply and the "no reply drafted" fallback below are
+ * the original display, unchanged; what is new is the conversation textarea
+ * and the Draft Reply button above them, and the fact that a reply drafted
+ * from that textarea lands in the same box rather than a second one.
+ *
  * The user pastes the LinkedIn thread here, because LinkedIn cannot be read
  * from this app. The text is kept on `gab_leads.conversation_history` so it
  * survives closing the modal, and the drafted reply is kept on
- * `gab_leads.reply_draft` so a draft made yesterday is still here today.
+ * `gab_leads.reply_draft` so a draft made yesterday is still here today —
+ * and is shown on open without anyone pressing the button again.
  *
  * Typing is never thrown away: the textarea saves on blur, there is an
  * explicit Save for people who prefer one, and drafting saves first. A
  * remote change to the row only overwrites the box when the user has no
  * unsaved edits in it.
  */
-function ConversationSection({ lead }: { lead: Lead }) {
+function ReplySection({
+  lead,
+  pipelineReply,
+  responseNeeded,
+  responseReason,
+}: {
+  lead: Lead;
+  /** Whatever draft the row already carries — column or traits. */
+  pipelineReply: string | null;
+  responseNeeded: boolean | null;
+  responseReason: string | null;
+}) {
   const { updateLead } = useLeads();
   const { clientId } = useAuth();
 
@@ -235,18 +271,18 @@ function ConversationSection({ lead }: { lead: Lead }) {
     setDrafting(false);
   };
 
-  const stored = lead.reply_draft?.trim() ?? '';
-  const shown = fresh ?? (stored || null);
+  // A reply just drafted wins; otherwise whatever the row already had, which
+  // is what the existing display has always rendered.
+  const replyDraft = fresh ?? pipelineReply;
 
   return (
-    <section className="border-t border-slate-200 pt-5">
-      <h3 className="text-sm font-semibold text-slate-900">Conversation and reply</h3>
-      <p className="mt-1 text-xs text-slate-600">
+    <div className="space-y-4">
+      <p className="text-xs text-slate-600">
         This dashboard cannot read LinkedIn. Paste the thread here and a reply is drafted from
         it — you still send it yourself.
       </p>
 
-      <label className="mt-4 block">
+      <label className="block">
         <span className="label">Paste the LinkedIn conversation (both sides)</span>
         <textarea
           className="input mt-1 min-h-[9rem] font-normal"
@@ -257,7 +293,7 @@ function ConversationSection({ lead }: { lead: Lead }) {
         />
       </label>
 
-      <div className="mt-2 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           className="btn-secondary"
@@ -282,7 +318,7 @@ function ConversationSection({ lead }: { lead: Lead }) {
       </div>
 
       {saveError ? (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
           <p className="font-medium">The conversation could not be saved.</p>
           <p className="mt-1 break-words font-mono">{saveError.message}</p>
           {saveError.hint ? <p className="mt-1">{saveError.hint}</p> : null}
@@ -290,42 +326,43 @@ function ConversationSection({ lead }: { lead: Lead }) {
       ) : null}
 
       {draftError ? (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
           <p className="font-medium">{draftError.message}</p>
           {draftError.hint ? <p className="mt-1 break-words">{draftError.hint}</p> : null}
         </div>
       ) : null}
 
       {draftWarning ? (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           {draftWarning}
         </div>
       ) : null}
 
-      <div className="mt-4">
-        {drafting && !shown ? (
-          <div className="card p-4">
-            <div className="skeleton h-3 w-40" />
-            <div className="skeleton mt-3 h-3 w-full" />
-            <div className="skeleton mt-2 h-3 w-5/6" />
+      {/* The original reply-draft display. A draft — whether it came from the
+          pipeline, a previous session, or the button above — shows in this
+          box; the fallback below is the untouched "no reply drafted" case. */}
+      {drafting && !replyDraft ? (
+        <div className="card p-4">
+          <div className="skeleton h-3 w-40" />
+          <div className="skeleton mt-3 h-3 w-full" />
+          <div className="skeleton mt-2 h-3 w-5/6" />
+        </div>
+      ) : replyDraft ? (
+        <MessageCard title="Reply draft" body={replyDraft} />
+      ) : responseNeeded === false ? (
+        // Explicitly told no reply is needed — show the reasoning instead of an
+        // empty box that looks like something failed.
+        <div className="card border-slate-200 bg-slate-50">
+          <div className="px-4 py-3">
+            <h3 className="text-sm font-semibold text-slate-900">No reply drafted</h3>
+            <p className="mt-1 text-sm text-slate-700">
+              {responseReason ??
+                'The profiling step marked this lead as not needing a response, without recording a reason.'}
+            </p>
           </div>
-        ) : shown ? (
-          <MessageCard
-            title="Drafted reply"
-            subtitle={
-              fresh
-                ? 'Drafted just now from the conversation above.'
-                : 'Drafted earlier and saved to this lead.'
-            }
-            body={shown}
-          />
-        ) : (
-          <p className="rounded-md border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-500">
-            No reply has been drafted for this lead yet.
-          </p>
-        )}
-      </div>
-    </section>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -338,14 +375,14 @@ export function OutreachTab({
   onPatch: (patch: LeadPatch) => void;
   saving: boolean;
 }) {
-  const invite = lead.invite_message?.trim() ?? '';
-  const inmailSubject = traitString(lead.traits, 'linkedin_inmail_subject');
-  const inmailMessage = traitString(lead.traits, 'linkedin_inmail_message');
-  const replyDraft = firstTrait(lead, REPLY_KEYS);
+  const invite = messageText(lead, 'invite_message') ?? '';
+  const inmailSubject = messageText(lead, 'linkedin_inmail_subject');
+  const inmailMessage = messageText(lead, 'linkedin_inmail_message');
+  const pipelineReply = columnString(lead, 'reply_draft') ?? firstTrait(lead, REPLY_KEYS);
   const responseNeeded = traitBool(lead.traits, 'response_needed');
   const responseReason = traitString(lead.traits, 'response_reason');
 
-  const hasAnyMessage = !!invite || !!inmailMessage || !!replyDraft || !!lead.reply_draft?.trim();
+  const hasAnyMessage = !!invite || !!inmailMessage || !!pipelineReply;
 
   return (
     <div className="space-y-6">
@@ -376,23 +413,12 @@ export function OutreachTab({
         />
       ) : null}
 
-      {replyDraft ? (
-        <MessageCard title="Reply draft" body={replyDraft} />
-      ) : responseNeeded === false ? (
-        // Explicitly told no reply is needed — show the reasoning instead of an
-        // empty box that looks like something failed.
-        <div className="card border-slate-200 bg-slate-50">
-          <div className="px-4 py-3">
-            <h3 className="text-sm font-semibold text-slate-900">No reply drafted</h3>
-            <p className="mt-1 text-sm text-slate-700">
-              {responseReason ??
-                'The profiling step marked this lead as not needing a response, without recording a reason.'}
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      <ConversationSection lead={lead} />
+      <ReplySection
+        lead={lead}
+        pipelineReply={pipelineReply}
+        responseNeeded={responseNeeded}
+        responseReason={responseReason}
+      />
 
       <section className="border-t border-slate-200 pt-5">
         <h3 className="mb-3 text-sm font-semibold text-slate-900">Status</h3>

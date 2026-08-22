@@ -4,7 +4,7 @@ import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
 import { fetchAccountRecord, type AccountRecord } from '../lib/auth';
 import { MAX_ROWS, SUPPORT_EMAIL } from '../lib/constants';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseConfigError } from '../lib/supabase';
 
 /**
  * Deliberately free of backend branding: no vendor name, no project URL, no
@@ -14,10 +14,12 @@ import { supabase } from '../lib/supabase';
  * read from the user's own gab_users row (user_id = auth.uid()) and shown here
  * so it can be recovered after the one-time Setup complete screen has gone.
  *
- * This is also the one screen that does NOT surface raw query errors. Every
- * other screen still shows the real message, because those are working
- * surfaces where diagnosing a failure matters; here a failure is reported as
- * a plain status with a route to a human.
+ * This is also the one screen that does NOT surface raw query errors — with
+ * one exception, the licence key, where a silent blank is useless to everyone
+ * and the failing query is shown instead. Every other screen still shows the
+ * real message, because those are working surfaces where diagnosing a failure
+ * matters; here a failure is otherwise reported as a plain status with a route
+ * to a human.
  */
 
 /** Total leads visible to this account. RLS scopes the count. */
@@ -52,18 +54,56 @@ function useAccountLeadCount() {
   return { count, failed, loading };
 }
 
-/** The signed-in user's own gab_users row: licence key and recorded email. */
+/**
+ * The signed-in user's own gab_users row: licence key and recorded email.
+ * This always resolves to a record — a missing client or a missing user id
+ * produce a stated reason, never an endless skeleton.
+ */
 function useAccountRecord(userId: string | null | undefined) {
   const [record, setRecord] = useState<AccountRecord | null>(null);
 
   useEffect(() => {
-    if (!supabase || !userId) return;
     let cancelled = false;
+
+    if (!supabase) {
+      setRecord({
+        licenseKey: {
+          state: 'error',
+          error: {
+            message: supabaseConfigError ?? 'The database client is not configured.',
+            hint: null,
+            code: 'CONFIG',
+          },
+          detail: 'No query was attempted.',
+        },
+        email: null,
+      });
+      return;
+    }
+
+    if (!userId) {
+      setRecord({
+        licenseKey: {
+          state: 'error',
+          error: {
+            message: 'You are signed in, but the session carries no user id.',
+            hint: 'Log out and back in. If it persists, the auth session did not restore properly.',
+            code: 'NO_USER_ID',
+          },
+          detail: 'No query was attempted — auth.uid() is unknown to this page.',
+        },
+        email: null,
+      });
+      return;
+    }
+
+    setRecord(null);
     // Two attempts, not four: on Settings the row either exists or the user
-    // needs to hear so, and a long backoff is just a stalled panel.
+    // needs to hear why it does not, and a long backoff is a stalled panel.
     void fetchAccountRecord(supabase, userId, 2).then((result) => {
       if (!cancelled) setRecord(result);
     });
+
     return () => {
       cancelled = true;
     };
@@ -76,23 +116,31 @@ function useAccountRecord(userId: string | null | undefined) {
  * Same treatment as the Setup complete screen: a selectable monospace block
  * with a Copy button, and an explanation of which of the user's two
  * credentials this one is.
+ *
+ * This is the deliberate exception to "Settings shows no raw errors". A key
+ * that just is not there is unsupportable — nobody can act on a blank space —
+ * so when the read fails or comes back empty, the query that ran and the exact
+ * message that came back are both on screen, quotable to whoever can fix it.
  */
 function LicenseKeyBlock({ record }: { record: AccountRecord | null }) {
+  const key = record?.licenseKey;
+
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">
       <h3 className="text-sm font-semibold text-slate-900">Your LinkedIn extension key</h3>
 
-      {record === null ? (
+      {record === null || key === undefined ? (
         <div className="mt-2">
           <div className="skeleton h-10 w-full" />
+          <p className="mt-2 text-xs text-slate-500">Reading your account…</p>
         </div>
-      ) : record.licenseKey.state === 'found' ? (
+      ) : key.state === 'found' ? (
         <>
           <div className="mt-2 flex items-center gap-2">
             <code className="min-w-0 flex-1 select-all break-all rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-900">
-              {record.licenseKey.licenseKey}
+              {key.licenseKey}
             </code>
-            <CopyButton text={record.licenseKey.licenseKey} className="btn-secondary shrink-0" />
+            <CopyButton text={key.licenseKey} className="btn-secondary shrink-0" />
           </div>
           <p className="mt-2 text-xs text-slate-600">
             Paste this as your password when the LinkedIn extension asks you to log in, using the
@@ -100,19 +148,37 @@ function LicenseKeyBlock({ record }: { record: AccountRecord | null }) {
           </p>
         </>
       ) : (
-        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          {record.licenseKey.state === 'missing'
-            ? 'No key has been generated for your account yet.'
-            : record.licenseKey.state === 'empty'
-              ? 'Your account record exists, but no key has been set on it.'
-              : 'Your key could not be read just now.'}{' '}
-          Ask{' '}
-          <a href={`mailto:${SUPPORT_EMAIL}`} className="underline underline-offset-2">
-            {SUPPORT_EMAIL}
-          </a>{' '}
-          to send it to you. The dashboard works normally without it — it is only needed by the
-          LinkedIn extension.
-        </p>
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+          <p className="font-medium">
+            {key.state === 'missing'
+              ? 'Your key could not be found.'
+              : key.state === 'empty'
+                ? 'Your account record exists, but no key has been set on it.'
+                : 'Your key could not be read.'}
+          </p>
+
+          {key.state === 'error' ? (
+            <p className="mt-1.5 break-words font-mono">
+              {key.error.code ? `[${key.error.code}] ` : ''}
+              {key.error.message}
+            </p>
+          ) : null}
+
+          <p className="mt-1.5 break-words font-mono text-[11px] text-amber-800">{key.detail}</p>
+
+          {key.state === 'error' && key.error.hint ? (
+            <p className="mt-1.5">{key.error.hint}</p>
+          ) : null}
+
+          <p className="mt-2">
+            The dashboard works normally without it — it is only needed by the LinkedIn
+            extension. Send the two lines above to{' '}
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="underline underline-offset-2">
+              {SUPPORT_EMAIL}
+            </a>{' '}
+            and they can tell you which it is.
+          </p>
+        </div>
       )}
     </div>
   );
