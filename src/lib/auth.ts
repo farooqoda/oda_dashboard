@@ -320,54 +320,167 @@ export async function fetchClientLink(
 export const USERS_TABLE = 'gab_users';
 export const LICENSE_KEY_COLUMN = 'license_key';
 
+export const EMAIL_COLUMN = 'email';
+
+/** PostgREST/Postgres: "column ... does not exist". */
+const UNDEFINED_COLUMN = '42703';
+
 export type LicenseKeyOutcome =
   /** Found it. */
   | { state: 'found'; licenseKey: string }
   /** The row exists but the key column is empty. */
-  | { state: 'empty' }
-  /** No row for this user yet — generation may not have run. */
-  | { state: 'missing' }
+  | { state: 'empty'; detail: string }
+  /** No row for this user yet — generation may not have run, or RLS hides it. */
+  | { state: 'missing'; detail: string }
   /** The read failed, usually because RLS does not expose the row. */
-  | { state: 'error'; error: FriendlyError };
+  | { state: 'error'; error: FriendlyError; detail: string };
+
+export interface AccountRecord {
+  licenseKey: LicenseKeyOutcome;
+  /**
+   * The email recorded on the account row, which is NOT the same thing as the
+   * email on the auth session: rows created before the column existed have
+   * none. Null means "not set", never "failed to read".
+   */
+  email: string | null;
+}
+
+interface RowLookup {
+  row: Record<string, unknown> | null;
+  error: FriendlyError | null;
+  /** The column the successful (or last) attempt matched on. */
+  column: string;
+}
 
 /**
- * Reads the signed-in user's own licence key.
+ * `select * from gab_users where user_id = auth.uid()`, with one fallback.
+ *
+ * Most deployments key this table on `user_id`. A few key it on `id` instead,
+ * and there the first query fails with 42703 — a schema mismatch, not a
+ * permissions problem, and worth surviving rather than reporting as "no key".
+ * The whole row is selected rather than named columns so that a table without
+ * an `email` column still yields its licence key.
+ */
+async function readOwnUserRow(client: SupabaseClient, userId: string): Promise<RowLookup> {
+  const primary = AUTH_COLUMNS.userId;
+
+  const attempt = async (column: string): Promise<RowLookup> => {
+    const { data, error } = await client
+      .from(USERS_TABLE)
+      .select('*')
+      .eq(column, userId)
+      .limit(1);
+
+    if (error) return { row: null, error: toFriendlyError(error), column };
+    return { row: ((data ?? [])[0] as Record<string, unknown> | undefined) ?? null, error: null, column };
+  };
+
+  const first = await attempt(primary);
+
+  // The table is keyed differently: `id` is the answer, whatever it returns.
+  if (first.error?.code === UNDEFINED_COLUMN) return attempt('id');
+
+  if (first.error || first.row) return first;
+
+  // No row and no error. Try `id` too, but only a hit counts — an error there
+  // (a uuid compared against a bigint, say) says nothing about this account.
+  const second = await attempt('id');
+  return second.row ? second : first;
+}
+
+/** The policy that makes this row readable, quoted verbatim where it helps. */
+const OWN_ROW_POLICY = `create policy "read own user row" on ${USERS_TABLE} for select using (${AUTH_COLUMNS.userId} = auth.uid());`;
+
+/**
+ * `toFriendlyError` writes its permissions hint for the lead tables, which is
+ * the wrong advice here — this read fails on a `gab_users` policy, not a
+ * `gab_leads` one, and sending someone to the wrong table costs an afternoon.
+ */
+function withUsersHint(error: FriendlyError): FriendlyError {
+  const permissions =
+    error.code === '42501' ||
+    error.code === 'PGRST301' ||
+    /permission denied|not authorized|row-level security|RLS|JWT/i.test(error.message);
+  if (!permissions) return error;
+  return { ...error, hint: `${USERS_TABLE} needs a policy such as: ${OWN_ROW_POLICY}` };
+}
+
+/**
+ * Reads the signed-in user's own row from gab_users — their licence key and
+ * the email recorded alongside it. RLS scopes this to `user_id = auth.uid()`,
+ * so there is no other row it could return.
  *
  * The row is generated for them server-side, which may not have happened by
  * the instant signUp resolves, so a missing row is retried briefly with
  * backoff before being reported as missing. An RLS refusal is NOT retried —
  * it will not fix itself, and retrying only delays the message.
+ *
+ * Every failure carries a `detail` naming the query that was run, because a
+ * licence key that silently does not appear is unsupportable: the user needs
+ * to be able to tell someone what was asked and what came back.
  */
+export async function fetchAccountRecord(
+  client: SupabaseClient,
+  userId: string,
+  attempts = 4,
+): Promise<AccountRecord> {
+  let delay = 400;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const { row, error, column } = await readOwnUserRow(client, userId);
+    const query = `select ${LICENSE_KEY_COLUMN} from ${USERS_TABLE} where ${column} = '${userId}'`;
+
+    if (error) {
+      return { licenseKey: { state: 'error', error: withUsersHint(error), detail: query }, email: null };
+    }
+
+    if (row) {
+      const rawEmail = row[EMAIL_COLUMN];
+      const email = typeof rawEmail === 'string' && rawEmail.trim() ? rawEmail.trim() : null;
+      const key = row[LICENSE_KEY_COLUMN];
+      if (typeof key === 'string' && key.trim()) {
+        return { licenseKey: { state: 'found', licenseKey: key.trim() }, email };
+      }
+      return {
+        licenseKey: {
+          state: 'empty',
+          detail:
+            LICENSE_KEY_COLUMN in row
+              ? `${query} returned a row whose ${LICENSE_KEY_COLUMN} is empty.`
+              : `${query} returned a row with no ${LICENSE_KEY_COLUMN} column on it.`,
+        },
+        email,
+      };
+    }
+
+    if (attempt === attempts - 1) {
+      return {
+        licenseKey: {
+          state: 'missing',
+          detail: `${query} returned no rows. Either no row exists for this account, or ${USERS_TABLE} has no policy exposing it to the signed-in user — that policy is: ${OWN_ROW_POLICY}`,
+        },
+        email: null,
+      };
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    delay *= 2;
+  }
+
+  return {
+    licenseKey: { state: 'missing', detail: `No attempt was made to read ${USERS_TABLE}.` },
+    email: null,
+  };
+}
+
+/** The licence key on its own, for callers that do not need the rest. */
 export async function fetchLicenseKey(
   client: SupabaseClient,
   userId: string,
   attempts = 4,
 ): Promise<LicenseKeyOutcome> {
-  let delay = 400;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const { data, error } = await client
-      .from(USERS_TABLE)
-      .select(LICENSE_KEY_COLUMN)
-      .eq(AUTH_COLUMNS.userId, userId)
-      .limit(1);
-
-    if (error) return { state: 'error', error: toFriendlyError(error) };
-
-    const row = (data ?? [])[0] as Record<string, unknown> | undefined;
-    if (row) {
-      const key = row[LICENSE_KEY_COLUMN];
-      if (typeof key === 'string' && key.trim()) return { state: 'found', licenseKey: key.trim() };
-      return { state: 'empty' };
-    }
-
-    if (attempt < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay *= 2;
-    }
-  }
-
-  return { state: 'missing' };
+  const { licenseKey } = await fetchAccountRecord(client, userId, attempts);
+  return licenseKey;
 }
 
 // ---------------------------------------------------------------------------

@@ -74,13 +74,25 @@ route through it — signup with a session, a parked code redeemed on first sign
 That key is the credential for the **LinkedIn extension**, paired with the same email. It is
 not the dashboard password, and the dashboard password is not it; the screen says so, because
 having two credentials for one account is exactly the kind of thing users conflate. It is
-shown once and is deliberately not repeated anywhere else in the app, Settings included.
+shown once here, and repeated only on Settings, where the user can recover it later.
 
 The row is generated server-side and may not exist the instant `signUp` resolves, so a
 missing row is retried with backoff before being reported. An RLS refusal is **not** retried —
 it will not fix itself. If the key cannot be read for any reason the account still works and
 the screen says so, pointing at support, rather than blocking the user behind a value they
 do not strictly need to use the dashboard.
+
+**Settings shows the key too.** Users lose it, and "sign up again" is not a recovery path, so
+Settings reads the same `gab_users` row (`user_id = auth.uid()`) and renders the key in the
+same copyable block, alongside the `email` recorded on that row — which is null on older
+accounts and shows as "Not set" rather than breaking the panel.
+
+When that read comes back empty, Settings says **why**, on screen: the query it ran, the user
+id it ran it for, and either the verbatim Postgres error with its code or the fact that it
+matched no rows — plus the `gab_users` policy that would fix it. A licence key that silently
+does not appear is unsupportable, so this is the one place Settings shows a raw error. The
+read also falls back to an `id`-keyed `gab_users` if `user_id` does not exist (Postgres
+42703), because that is a schema difference rather than a missing key.
 
 ### Supabase project settings
 
@@ -182,22 +194,53 @@ because it is a database migration rather than app code and you did not ask for 
 
 ### What the app expects from the database
 
-* `gab_leads` — readable, and updatable on `stage`, `connection_status`, `review_status`.
-  Those three are the only columns this app ever writes.
+* `gab_leads` — readable, and updatable on `stage`, `connection_status`, `review_status`,
+  `conversation_history` and `reply_draft`. Those five are the only columns this app ever
+  writes. The last two back the Outreach tab's conversation box: `conversation_history` holds
+  the LinkedIn thread the user pasted, `reply_draft` the reply drafted from it.
+  Realtime must be enabled on this table (`alter publication supabase_realtime add table
+  gab_leads;`) for new leads to appear without a refresh; without it the dashboard still
+  works, it just goes stale between manual refreshes.
 * `gab_activity` — readable, filtered by `linkedin_url` (plus `client_id` when the lead has
   one, since `linkedin_url` is only unique per client).
 * `gab_client_invites`, `gab_user_clients` — touched only during sign up and sign in, to
   resolve which client an account belongs to.
-* `gab_users` — the signed-in user reads **their own row only**, once, for `license_key`.
-  Requires a policy such as
+* `gab_users` — the signed-in user reads **their own row only**, for `license_key` and
+  `email` (Setup complete and Settings). Requires a policy such as
   `create policy "read own user row" on gab_users for select using (user_id = auth.uid());`
-* `gab_users`, `gab_clients`, `gab_frameworks`, `gab_invite_log` — never touched. They hold
-  licence keys and are deliberately locked.
+  The whole row is selected rather than named columns, so a deployment without an `email`
+  column still gets its licence key instead of failing the query outright.
+* `gab_clients`, `gab_frameworks`, `gab_invite_log` — never touched, and deliberately
+  locked.
 
 Up to 1,000 rows are fetched per load, newest `created_at` first; paging, filtering, sorting
 and every statistic are computed client-side from that set. If the table holds more than
 1,000 rows, Settings says so explicitly rather than quietly reporting partial numbers as
 totals.
+
+### Staying live without flickering
+
+Leads arrive on their own, and the app is judged on whether that feels calm. Two things make
+it so, and both were bugs first.
+
+**Realtime lands as a diff, not a reload.** A change event is applied to the row it names:
+an update replaces that one row in place, an insert is spliced into its sorted position, a
+delete removes it. Rows that did not change keep their exact object identity, and when a
+refetch turns out to be equivalent the array itself is kept — so React re-renders nothing,
+the list does not flash and the scroll position survives. Payloads carry only what the
+table's replica identity exposes, so an incoming row is merged over the known one, never
+substituted for it. Behind that, a debounced *silent* reconcile (no "Refreshing…" state, no
+dimmed panels) refetches to cover dropped events and reconnects. The previous version
+refetched everything on every event and replaced the whole array, which is what made the
+list flash.
+
+**A token refresh is not a sign-out.** `autoRefreshToken` fires an auth event roughly hourly,
+and again on tab focus. Those carry the same user with a new JWT. Treating them as a new
+sign-in re-ran the client lookup, dropped `status` to `loading`, unmounted everything behind
+the gate — `LeadsProvider` included — and flashed the boot screen mid-session. Now the
+*identity of the user* is what invalidates the link, so a refresh changes nothing on screen,
+and a known `client_id` outranks any in-flight re-check in `status`, so a background check
+can never demote a working dashboard back to loading.
 
 ---
 
@@ -299,13 +342,71 @@ panel or the word "undefined".
 
 Settings carries no backend branding: no vendor name, no project URL or hostname, no mention
 of the database engine or of API keys. It shows a generic system status, the signed-in email,
-the client, the account's total lead count, a support address, and a Log out button.
+the email on the account row, the client, the account's total lead count, the LinkedIn
+extension key with a Copy button, a support address, and a Log out button.
 
 That makes it the **one screen that does not surface raw query errors** — a failure there is
 reported as "System status: Unavailable" with a route to a human. Every other screen still
 shows the real message with the RLS hint, because those are working surfaces where diagnosing
 a failure is the point. The support address is `SUPPORT_EMAIL` in
 [`src/lib/constants.ts`](src/lib/constants.ts) — change it to an address your team monitors.
+
+## Drafting a reply from a conversation
+
+The Outreach tab's **reply-draft area is extended, not replaced**. The box that shows a
+drafted reply — and its "no reply drafted" fallback, whose text comes from the row's
+`response_reason` — is the one that has always been there. What is new sits directly above
+it: a textarea and a Draft Reply button, whose result lands in that same box. There is
+deliberately no second reply-draft display.
+
+This app cannot read LinkedIn, so the user pastes the thread — both sides — into the
+textarea. It saves to `gab_leads.conversation_history` on blur, on an explicit **Save**, and
+again before drafting; typing is never lost by navigating away, and a change to the row from
+elsewhere only overwrites the box when there is nothing unsaved in it.
+
+**Draft Reply** POSTs to the n8n workflow at `DRAFT_REPLY_WEBHOOK`
+([`src/lib/constants.ts`](src/lib/constants.ts)):
+
+```jsonc
+// →
+{ "lead_id": 123, "client_id": "…", "conversation_text": "…" }
+// ←
+{ "reply_draft": "…" }
+```
+
+The draft is shown read-only with a Copy button, in the existing reply-draft box, and
+written back to `gab_leads.reply_draft` so it is still there next session — that value is
+also read when the modal opens, so a draft from a previous session or from the pipeline
+shows up without anyone pressing the button. The response is parsed defensively: a bare object, a
+single-element array, an `{ output }` / `{ json }` wrapper or plain text all work, because
+which one you get depends on how the workflow's final node is configured. Nothing is sent
+to LinkedIn; as everywhere else in this app, the user copies and sends by hand.
+
+This is the only outbound request the dashboard makes to anything other than Supabase.
+
+### Where a message lives
+
+The invite, the InMail subject and body, and the reply draft are read from **the column if
+there is one, and from `traits` if there is not** — `select('*')` returns whatever columns
+the table actually has, so both are checked, column first. Different pipelines have written
+these to different places, and keying the display off only one of them meant an InMail that
+existed did not render. `messageText()` in
+[`OutreachTab.tsx`](src/components/modal/OutreachTab.tsx) is the single place that decides.
+
+Those three cards still read fixed key names, and that is precisely how a lead could sit on
+the Outreach tab saying "no messages have been generated" while the pipeline had written one
+under a name this app had never been told about. So **any other message-shaped value on the
+row is discovered, not declared**: `discoverMessages()` walks the columns and the traits,
+takes every string whose key reads like a message (`message`, `inmail`, `invite`, `outreach`,
+`reply`, `draft`, `note`, `pitch`) and is not an identity, status or bookkeeping field, and
+renders it in the same card as the rest — with its `*_subject` sibling as the subtitle, and
+the 300-character connection-note limit applied when the name says invite. A body that
+appears in both a column and `traits` is shown once.
+
+When nothing is found, the empty state lists **the fields the row does carry**, names and
+sizes only, never values. "No messages have been generated yet" is a dead end when the
+message demonstrably exists in the database; the field list is either where it actually
+landed or proof that it never arrived.
 
 ## What this app deliberately does not do
 
@@ -331,12 +432,14 @@ src/
     constants.ts        the ten buckets, seven stages, page size, fetch limit
     selectors.ts        filtering, sorting, counts, chart aggregation
     supabase.ts         client + the error-to-message mapping (RLS hints live here)
+    draftReply.ts       the one non-Supabase call: conversation in, reply draft out
     format.ts           initials, dates, fit bands, pill colours
     csv.ts              export of the current filtered set
     auth.ts             invite redemption, licence key, auth errors, table/column assumptions
   data/
     AuthProvider.tsx    session, client_id, sign in / sign up / sign out
-    LeadsProvider.tsx   one fetch, shared by every screen; optimistic writes with rollback
+    LeadsProvider.tsx   one fetch, shared by every screen; realtime applied as a diff,
+                        optimistic writes with rollback
   components/
     charts.tsx          hand-rolled SVG charts, one accent hue, each with a table view
     modal/              the lead detail modal and its four tabs

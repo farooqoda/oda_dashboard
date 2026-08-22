@@ -68,6 +68,13 @@ export const FIT_HIGH = 70;
 export const FIT_MID = 40;
 
 /**
+ * Drafts a reply from a pasted LinkedIn conversation. It is given the lead id,
+ * the caller's client id and the conversation text, and answers with
+ * `{ reply_draft }`. Nothing else in this app talks to it.
+ */
+export const DRAFT_REPLY_WEBHOOK = 'https://mfarooqiqbal.app.n8n.cloud/webhook/draft-reply';
+
+/**
  * Shown on Settings and wherever the user needs a human. Change this to the
  * address your team actually monitors.
  */
