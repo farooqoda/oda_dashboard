@@ -72,7 +72,7 @@ export const FIT_MID = 40;
  * the caller's client id and the conversation text, and answers with
  * `{ reply_draft }`. Nothing else in this app talks to it.
  */
-export const DRAFT_REPLY_WEBHOOK = 'https://mfarooqiqbal.app.n8n.cloud/webhook/draft-reply';
+export const DRAFT_REPLY_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-reply';
 
 /**
  * Shown on Settings and wherever the user needs a human. Change this to the
