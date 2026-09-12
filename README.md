@@ -261,6 +261,29 @@ Three rules, enforced there rather than in each component:
 3. A key whose value is **empty** — `null`, `undefined`, `""`, `[]`, `{}` — renders nowhere.
    No empty labels, no "undefined" on screen.
 
+### The detailed write-up
+
+`detailed_response` is the long-form reading of the lead that the client's prompt produced.
+Its structure belongs to whoever wrote that prompt — headed sections on one row, bare bullets
+on the next — so it is rendered as **markdown**, leading the Psychographics tab and folded
+behind a "Details" disclosure under the invite on Outreach. The DISC/ODA fields render below
+it exactly as before, and when the key is absent (an empty cell in the client's sheet)
+neither tab shows anything new.
+
+[`Markdown.tsx`](src/components/Markdown.tsx) is hand-written rather than a dependency: the
+app carries no UI libraries, the subset that matters is small — headings, bold, italics,
+inline code, bullet and numbered lists, links, quotes, rules, fenced code — and every node it
+produces is a React element. Nothing reaches `dangerouslySetInnerHTML`, so model-authored
+text cannot inject markup into the dashboard whatever the prompt returns, and `href`s are
+limited to `http`, `https` and `mailto`. Text it does not recognise falls through as plain
+text with its line breaks intact. Emphasis follows CommonMark's flanking rules, so
+`detailed_response` stays a key rather than becoming an italic and `3 * 4 * 5` stays
+arithmetic.
+
+The key is registered with `surface: 'detail'`, which means "a tab draws this one explicitly,
+by name" — that is what keeps the Psychographics group loop from rendering it a second time
+under **Other**.
+
 ### Adding a new framework
 
 Add its keys to `TRAIT_DEFINITIONS`. That is the whole job; every screen picks them up.

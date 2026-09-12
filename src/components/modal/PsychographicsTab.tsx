@@ -1,10 +1,17 @@
-import { groupTraits, metaTraits, isEmptyTraitValue } from '../../lib/traitsRegistry';
+import {
+  detailedResponse,
+  groupTraits,
+  isEmptyTraitValue,
+  metaTraits,
+} from '../../lib/traitsRegistry';
 import type { Lead } from '../../lib/types';
+import { Markdown } from '../Markdown';
 import { TraitRow } from '../TraitValue';
 
 export function PsychographicsTab({ lead }: { lead: Lead }) {
   const groups = groupTraits(lead.traits);
   const meta = metaTraits(lead.traits);
+  const detail = detailedResponse(lead.traits);
   const hasTraits = !!lead.traits && !isEmptyTraitValue(lead.traits);
 
   if (!hasTraits) {
@@ -20,7 +27,7 @@ export function PsychographicsTab({ lead }: { lead: Lead }) {
     );
   }
 
-  if (groups.length === 0) {
+  if (groups.length === 0 && !detail) {
     return (
       <p className="text-sm text-slate-600">
         This lead has traits recorded, but every value belongs on another tab. Check Profile and
@@ -31,6 +38,17 @@ export function PsychographicsTab({ lead }: { lead: Lead }) {
 
   return (
     <div className="space-y-8">
+      {/* The profiling write-up leads, because it is the reading of this lead
+          that the rest of the tab then breaks into fields. */}
+      {detail ? (
+        <section>
+          <h3 className="mb-3 border-b border-slate-200 pb-2 text-sm font-semibold text-slate-900">
+            Detailed response
+          </h3>
+          <Markdown text={detail} />
+        </section>
+      ) : null}
+
       {groups.map((block) => (
         <section key={block.group}>
           <h3 className="mb-4 border-b border-slate-200 pb-2 text-sm font-semibold text-slate-900">

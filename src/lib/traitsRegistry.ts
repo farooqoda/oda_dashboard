@@ -37,8 +37,11 @@ export type TraitRenderType =
  * Where a trait is drawn. Several traits belong on the Profile or Outreach tab
  * rather than in the Psychographics groups, so the registry — not the tab —
  * decides placement.
+ *
+ * `detail` means a tab renders this key explicitly, by name, in a place of its
+ * own — so no group loop should pick it up and draw it a second time.
  */
-export type TraitSurface = 'psychographics' | 'profile' | 'outreach' | 'meta';
+export type TraitSurface = 'psychographics' | 'profile' | 'outreach' | 'meta' | 'detail';
 
 /** Psychographics groups, in render order. */
 export const TRAIT_GROUPS = [
@@ -237,6 +240,17 @@ export const TRAIT_DEFINITIONS: Record<string, TraitDefinition> = {
     type: 'message',
     group: 'assessment',
     surface: 'outreach',
+  },
+  detailed_response: {
+    // The long-form write-up the profiling prompt produced. Its structure is
+    // the client's, not ours — headings one row, bare bullets the next — so it
+    // is rendered as markdown, at the top of Psychographics and behind a
+    // "Details" disclosure on Outreach. `detail` keeps it out of the
+    // Psychographics groups, which would otherwise draw it twice.
+    label: 'Detailed response',
+    type: 'long',
+    group: 'assessment',
+    surface: 'detail',
   },
   prompt_version: {
     label: 'Prompt version',
@@ -517,6 +531,14 @@ export function odaBucket(traits: TraitsRecord | null | undefined): string | nul
 
 export function fitScore(traits: TraitsRecord | null | undefined): number | null {
   return traitNumber(traits, 'fit_score');
+}
+
+/**
+ * The profiling write-up, when the client's prompt produced one. Absent — an
+ * empty cell in their sheet — is the normal case and renders nothing at all.
+ */
+export function detailedResponse(traits: TraitsRecord | null | undefined): string | null {
+  return traitString(traits, 'detailed_response');
 }
 
 /** Every trait value flattened into one lowercase haystack, for search. */
