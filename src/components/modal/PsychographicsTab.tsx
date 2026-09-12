@@ -1,17 +1,12 @@
-import {
-  detailedResponse,
-  groupTraits,
-  isEmptyTraitValue,
-  metaTraits,
-} from '../../lib/traitsRegistry';
+import { groupTraits, isEmptyTraitValue, metaTraits } from '../../lib/traitsRegistry';
 import type { Lead } from '../../lib/types';
-import { Markdown } from '../Markdown';
+import { DetailedAnalysis, hasDetailedAnalysis } from '../DetailedAnalysis';
 import { TraitRow } from '../TraitValue';
 
 export function PsychographicsTab({ lead }: { lead: Lead }) {
   const groups = groupTraits(lead.traits);
   const meta = metaTraits(lead.traits);
-  const detail = detailedResponse(lead.traits);
+  const detail = hasDetailedAnalysis(lead.traits);
   const hasTraits = !!lead.traits && !isEmptyTraitValue(lead.traits);
 
   if (!hasTraits) {
@@ -45,7 +40,7 @@ export function PsychographicsTab({ lead }: { lead: Lead }) {
           <h3 className="mb-3 border-b border-slate-200 pb-2 text-sm font-semibold text-slate-900">
             Detailed response
           </h3>
-          <Markdown text={detail} />
+          <DetailedAnalysis traits={lead.traits} />
         </section>
       ) : null}
 
