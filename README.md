@@ -261,6 +261,45 @@ Three rules, enforced there rather than in each component:
 3. A key whose value is **empty** — `null`, `undefined`, `""`, `[]`, `{}` — renders nowhere.
    No empty labels, no "undefined" on screen.
 
+### The enriched analysis
+
+Three keys come out of the same prompt and are drawn together by
+[`DetailedAnalysis.tsx`](src/components/DetailedAnalysis.tsx), leading the Psychographics tab
+and folded behind a "Details" disclosure under the invite on Outreach:
+
+| key | rendered as |
+| --- | --- |
+| `priority` | a badge — High red, Medium yellow, Low grey; any other word keeps its text in a neutral badge |
+| `recommended_next_step` | a labelled paragraph |
+| `detailed_response` | markdown |
+
+All three are optional: any subset renders, and a row with none of them shows nothing new on
+either tab.
+
+`detailed_response` is the long-form reading of the lead, and its structure belongs to
+whoever wrote the prompt — headed sections on one row, bare bullets on the next — so it is
+rendered with **react-markdown**, styled element by element in
+[`Markdown.tsx`](src/components/Markdown.tsx) rather than by a typography plugin, so headings
+carry real hierarchy and hold their contrast on the card. react-markdown builds React
+elements and passes no raw HTML through without a plugin, so prompt-authored text cannot
+inject markup into the dashboard, and its default URL filter leaves only safe schemes in an
+`href`.
+
+These three are registered with `surface: 'detail'` — "a tab draws this one explicitly, by
+name" — which is what keeps the Psychographics group loop from drawing them a second time.
+
+### Key names are matched loosely
+
+The registry is keyed on `priority`, but a prompt may write `Priority`, `PRIORITY`,
+`recommendedNextStep` or `Recommended Next Step`. Exact-match lookup dropped every one of
+those into **Other** — "keys this dashboard has no display rule for yet" — with a registered,
+labelled rule sitting right there unused.
+
+So `lookupDefinition()` tries the exact spelling first and then a normalised one (camelCase
+split, lowercased, runs of punctuation collapsed to `_`), and `traitValue()` gives the typed
+accessors the same tolerance. **Other** still catches genuinely unknown keys, which is its
+job; it no longer catches known fields wearing a different hat.
+
 ### Adding a new framework
 
 Add its keys to `TRAIT_DEFINITIONS`. That is the whole job; every screen picks them up.

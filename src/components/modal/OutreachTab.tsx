@@ -6,6 +6,7 @@ import { requestReplyDraft } from '../../lib/draftReply';
 import { prettifyKey, traitBool, traitString } from '../../lib/traitsRegistry';
 import type { FriendlyError } from '../../lib/supabase';
 import type { Lead, LeadPatch } from '../../lib/types';
+import { DetailedAnalysis, hasDetailedAnalysis } from '../DetailedAnalysis';
 import { CopyButton } from '../ui';
 
 /** Frameworks have used several names for the drafted reply. */
@@ -496,6 +497,7 @@ export function OutreachTab({
   const pipelineReply = columnString(lead, 'reply_draft') ?? firstTrait(lead, REPLY_KEYS);
   const responseNeeded = traitBool(lead.traits, 'response_needed');
   const responseReason = traitString(lead.traits, 'response_reason');
+  const detail = hasDetailedAnalysis(lead.traits);
 
   // Everything the pipeline wrote under a name this file does not hardcode.
   const extraMessages = discoverMessages(
@@ -523,6 +525,18 @@ export function OutreachTab({
 
       {invite ? (
         <MessageCard title="Connection invite" body={invite} limit={INVITE_CHAR_LIMIT} />
+      ) : null}
+
+      {/* The same profiling write-up the Psychographics tab leads with — the
+          reasoning behind the message above — folded away by default so it
+          does not push the messages themselves off the screen. */}
+      {detail ? (
+        <details className="card px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-900">Details</summary>
+          <div className="mt-3 border-t border-slate-200 pt-3">
+            <DetailedAnalysis traits={lead.traits} />
+          </div>
+        </details>
       ) : null}
 
       {inmailMessage ? (

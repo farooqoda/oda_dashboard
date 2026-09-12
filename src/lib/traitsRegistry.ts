@@ -37,8 +37,13 @@ export type TraitRenderType =
  * Where a trait is drawn. Several traits belong on the Profile or Outreach tab
  * rather than in the Psychographics groups, so the registry — not the tab —
  * decides placement.
+ *
+ * `detail` means a tab renders this key explicitly, by name, in a place of its
+ * own — so no group loop should pick it up and draw it a second time. The
+ * enriched-analysis keys (`detailed_response`, `priority`,
+ * `recommended_next_step`) are all drawn together by `DetailedAnalysis`.
  */
-export type TraitSurface = 'psychographics' | 'profile' | 'outreach' | 'meta';
+export type TraitSurface = 'psychographics' | 'profile' | 'outreach' | 'meta' | 'detail';
 
 /** Psychographics groups, in render order. */
 export const TRAIT_GROUPS = [
@@ -166,18 +171,19 @@ export const TRAIT_DEFINITIONS: Record<string, TraitDefinition> = {
     order: 2,
   },
   priority: {
+    // These two and detailed_response are one output of the same prompt, so
+    // they are drawn together by <DetailedAnalysis>, not scattered through the
+    // Assessment group. `detail` is what keeps the group loop off them.
     label: 'Priority',
     type: 'short',
     group: 'assessment',
-    surface: 'psychographics',
-    order: 3,
+    surface: 'detail',
   },
   recommended_next_step: {
     label: 'Recommended next step',
     type: 'long',
     group: 'assessment',
-    surface: 'psychographics',
-    order: 4,
+    surface: 'detail',
   },
   conversation_summary: {
     label: 'Conversation summary',
@@ -237,6 +243,17 @@ export const TRAIT_DEFINITIONS: Record<string, TraitDefinition> = {
     type: 'message',
     group: 'assessment',
     surface: 'outreach',
+  },
+  detailed_response: {
+    // The long-form write-up the profiling prompt produced. Its structure is
+    // the client's, not ours — headings one row, bare bullets the next — so it
+    // is rendered as markdown, at the top of Psychographics and behind a
+    // "Details" disclosure on Outreach. `detail` keeps it out of the
+    // Psychographics groups, which would otherwise draw it twice.
+    label: 'Detailed response',
+    type: 'long',
+    group: 'assessment',
+    surface: 'detail',
   },
   prompt_version: {
     label: 'Prompt version',
@@ -352,6 +369,53 @@ export function isEmptyTraitValue(value: unknown): boolean {
 }
 
 /** `linkedin_inmail_subject` -> `Linkedin inmail subject`. */
+/**
+ * Key names arrive in whatever shape the prompt wrote them: `priority`,
+ * `Priority`, `PRIORITY`, `recommended_next_step`, `Recommended Next Step`,
+ * `recommendedNextStep`. They all mean the same field, and a registry lookup
+ * that only matches the exact spelling drops the other five into "Other keys
+ * this dashboard has no display rule for yet" — with a registered, labelled
+ * rule sitting right there unused.
+ */
+export function normaliseKey(key: string): string {
+  return key
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/** Normalised name -> definition, built once. Exact spellings win. */
+const NORMALISED_DEFINITIONS: Record<string, TraitDefinition> = (() => {
+  const index: Record<string, TraitDefinition> = {};
+  for (const [key, def] of Object.entries(TRAIT_DEFINITIONS)) {
+    const normalised = normaliseKey(key);
+    if (!(normalised in index)) index[normalised] = def;
+  }
+  return index;
+})();
+
+/** The display rule for a key, however that key happens to be spelled. */
+export function lookupDefinition(key: string): TraitDefinition | undefined {
+  return TRAIT_DEFINITIONS[key] ?? NORMALISED_DEFINITIONS[normaliseKey(key)];
+}
+
+/**
+ * A trait's raw value, matched with the same tolerance as the registry — so
+ * every typed accessor below finds `Fit Score` as readily as `fit_score`.
+ */
+export function traitValue(traits: TraitsRecord | null | undefined, key: string): unknown {
+  if (!traits) return undefined;
+  if (key in traits) return traits[key];
+
+  const wanted = normaliseKey(key);
+  for (const candidate of Object.keys(traits)) {
+    if (normaliseKey(candidate) === wanted) return traits[candidate];
+  }
+  return undefined;
+}
+
 export function prettifyKey(key: string): string {
   const words = key
     .replace(/[_-]+/g, ' ')
@@ -382,7 +446,7 @@ export function resolveTraits(traits: TraitsRecord | null | undefined): Resolved
   return Object.entries(traits)
     .filter(([, value]) => !isEmptyTraitValue(value))
     .map(([key, value]) => {
-      const def = TRAIT_DEFINITIONS[key];
+      const def = lookupDefinition(key);
       if (def) {
         return {
           key,
@@ -447,7 +511,7 @@ export function traitString(
   key: string,
 ): string | null {
   if (!traits) return null;
-  const value = traits[key];
+  const value = traitValue(traits, key);
   if (isEmptyTraitValue(value)) return null;
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -459,7 +523,7 @@ export function traitNumber(
   key: string,
 ): number | null {
   if (!traits) return null;
-  const value = traits[key];
+  const value = traitValue(traits, key);
   if (isEmptyTraitValue(value)) return null;
   const n = typeof value === 'number' ? value : Number(String(value).trim());
   return Number.isFinite(n) ? n : null;
@@ -470,7 +534,7 @@ export function traitBool(
   key: string,
 ): boolean | null {
   if (!traits) return null;
-  const value = traits[key];
+  const value = traitValue(traits, key);
   if (value === null || value === undefined) return null;
   if (typeof value === 'boolean') return value;
   const s = String(value).trim().toLowerCase();
@@ -517,6 +581,25 @@ export function odaBucket(traits: TraitsRecord | null | undefined): string | nul
 
 export function fitScore(traits: TraitsRecord | null | undefined): number | null {
   return traitNumber(traits, 'fit_score');
+}
+
+/**
+ * THE ENRICHED ANALYSIS
+ * ---------------------
+ * Three keys the profiling prompt emits together: the long-form write-up, how
+ * urgent the lead is, and what to do next. Each is absent on plenty of rows —
+ * an empty cell in the client's sheet — and absent renders nothing at all.
+ */
+export function detailedResponse(traits: TraitsRecord | null | undefined): string | null {
+  return traitString(traits, 'detailed_response');
+}
+
+export function priority(traits: TraitsRecord | null | undefined): string | null {
+  return traitString(traits, 'priority');
+}
+
+export function recommendedNextStep(traits: TraitsRecord | null | undefined): string | null {
+  return traitString(traits, 'recommended_next_step');
 }
 
 /** Every trait value flattened into one lowercase haystack, for search. */
