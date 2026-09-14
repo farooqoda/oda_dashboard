@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { MIN_PASSWORD_LENGTH, RESET_PASSWORD_REDIRECT_URL } from './constants';
 import { toFriendlyError, type FriendlyError } from './supabase';
 
 /**
@@ -77,6 +78,15 @@ export function toAuthError(error: unknown): FriendlyError {
     return friendly(
       'Sign up is not currently enabled.',
       'Ask an administrator to enable sign ups or to create the account for you.',
+    );
+  }
+  if (/should be different from the old password/i.test(raw)) {
+    return friendly('That is your current password. Choose a different one.');
+  }
+  if (/auth session missing|session.*not.*found|invalid.*refresh.*token/i.test(raw)) {
+    return friendly(
+      'Your session has expired.',
+      'Password reset links only work for a few minutes and only once. Request a new one.',
     );
   }
   return base;
@@ -518,4 +528,73 @@ export function clearPendingInvite(): void {
   } catch {
     /* nothing to do */
   }
+}
+
+// ---------------------------------------------------------------------------
+// Password reset and change
+// ---------------------------------------------------------------------------
+//
+// Two different entry points, one underlying call. Requesting the email
+// (signed out, on the Login screen) and setting the new password (either
+// from the emailed link's recovery session, or already signed in on
+// Settings) are separate steps — but "write the new password" is the exact
+// same `updateUser` call either way, so it lives here once rather than
+// once per screen.
+
+/**
+ * Kicks off Supabase's reset email. By design this call does not reveal
+ * whether the address has an account — it resolves the same way either way —
+ * so the caller shows the same "check your email" message regardless. What
+ * IS surfaced here is a genuine failure of the request itself (malformed
+ * address, rate limiting, no network), which is not the same thing as "no
+ * account exists" and is not a secret worth protecting.
+ */
+export async function requestPasswordReset(
+  client: SupabaseClient,
+  email: string,
+): Promise<FriendlyError | null> {
+  const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: RESET_PASSWORD_REDIRECT_URL,
+  });
+  return error ? toAuthError(error) : null;
+}
+
+/**
+ * `minLength` characters, and the two fields must match. Checked client-side
+ * before either password screen submits anything, so a typo is caught
+ * without a round trip — Supabase's own server-side policy (whatever it is
+ * configured to require) still gets the final say and is surfaced through
+ * `toAuthError` if it disagrees.
+ */
+export function validateNewPassword(
+  password: string,
+  confirmPassword: string,
+  minLength = MIN_PASSWORD_LENGTH,
+): FriendlyError | null {
+  if (password.length < minLength) {
+    return {
+      message: `Password must be at least ${minLength} characters.`,
+      hint: null,
+      code: 'PASSWORD_TOO_SHORT',
+    };
+  }
+  if (password !== confirmPassword) {
+    return { message: 'Passwords do not match.', hint: null, code: 'PASSWORD_MISMATCH' };
+  }
+  return null;
+}
+
+/**
+ * Sets a new password on the CURRENTLY authenticated session — which is
+ * exactly what both callers have: Settings has an ordinary signed-in
+ * session, and the reset-password page has the recovery session Supabase
+ * establishes when the user opens the emailed link. Neither passes the old
+ * password; that is `updateUser`'s job to not need.
+ */
+export async function updatePassword(
+  client: SupabaseClient,
+  newPassword: string,
+): Promise<FriendlyError | null> {
+  const { error } = await client.auth.updateUser({ password: newPassword });
+  return error ? toAuthError(error) : null;
 }

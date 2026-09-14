@@ -120,6 +120,42 @@ does not appear is unsupportable, so this is the one place Settings shows a raw 
 read also falls back to an `id`-keyed `gab_users` if `user_id` does not exist (Postgres
 42703), because that is a schema difference rather than a missing key.
 
+### Password reset and change
+
+Two entry points, one call underneath. `updatePassword()` in
+[`src/lib/auth.ts`](src/lib/auth.ts) wraps `supabase.auth.updateUser({ password })` and is
+shared by both — it needs an authenticated session and does not care how that session was
+reached, which is exactly the property both callers rely on:
+
+* **Settings → Change password.** An ordinary signed-in session. No email step, no old
+  password asked for — `updateUser` doesn't need one. Errors and a "Password changed"
+  confirmation show inline, the second of Settings' two deliberate exceptions to showing no
+  raw errors (the licence key is the first) — a password change that silently failed would
+  leave someone locked out with no idea why.
+* **Login → "Forgot password?"** Signed out, so there is no session yet to act on. Requests
+  an email instead, via `requestPasswordReset()` (`supabase.auth.resetPasswordForEmail`), and
+  shows the same "check your email" confirmation whether or not the address has an account —
+  Supabase's own API already keeps that from being observable, so the client does not have to
+  add its own care not to leak it. Opening the emailed link is what supplies the session:
+  Supabase puts a token in the URL, `detectSessionInUrl` (already on, see below) turns it into
+  a real session before any app code runs, and that lands the user on `/reset-password` —
+  a public, top-level route declared *outside* `RequireAuth` in `App.tsx`, deliberately, since
+  the normal gate would read that fresh session as an ordinary sign-in and, for an
+  already-linked user, drop them straight onto the dashboard instead of showing the new-
+  password form. [`ResetPasswordPage.tsx`](src/pages/ResetPasswordPage.tsx) has the full
+  reasoning. Both password fields, in both places, are checked client-side against the same
+  `validateNewPassword()` — at least `MIN_PASSWORD_LENGTH` characters, and the two fields
+  match — before anything is sent, with Supabase's own server-side policy still getting the
+  final say.
+
+`resetPasswordForEmail`'s `redirectTo` must be in this Supabase project's own allow-list
+(Authentication → URL Configuration → Redirect URLs) or it is silently ignored in favour of
+the project's default Site URL — with no error on either side, which is a hard thing to debug
+from the app alone. `RESET_PASSWORD_REDIRECT_URL` in
+[`constants.ts`](src/lib/constants.ts) is deliberately the literal deployed URL rather than
+something derived from `window.location`, so it can only ever mean the one address that
+actually needs to be on that list.
+
 ### Supabase project settings
 
 * Enable the **Email** provider under Authentication → Providers.
@@ -127,6 +163,8 @@ read also falls back to an `id`-keyed `gab_users` if `user_id` does not exist (P
   away. With it on, `signUp` returns a user but no session — there is no JWT to write with —
   so the code is parked in `localStorage` and redeemed on first sign-in. The signup screen
   says so explicitly rather than appearing to lose the code.
+* Add `RESET_PASSWORD_REDIRECT_URL` (`constants.ts`) to Authentication → URL Configuration →
+  Redirect URLs, or password-reset emails will link somewhere other than this app.
 
 ### Tables used for access control
 

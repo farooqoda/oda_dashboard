@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Card, CopyButton, PageHeader } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
-import { fetchAccountRecord, type AccountRecord } from '../lib/auth';
+import { fetchAccountRecord, updatePassword, validateNewPassword, type AccountRecord } from '../lib/auth';
 import { MAX_ROWS, SUPPORT_EMAIL } from '../lib/constants';
-import { supabase, supabaseConfigError } from '../lib/supabase';
+import { supabase, supabaseConfigError, type FriendlyError } from '../lib/supabase';
 
 /**
  * Deliberately free of backend branding: no vendor name, no project URL, no
@@ -15,11 +15,12 @@ import { supabase, supabaseConfigError } from '../lib/supabase';
  * so it can be recovered after the one-time Setup complete screen has gone.
  *
  * This is also the one screen that does NOT surface raw query errors — with
- * one exception, the licence key, where a silent blank is useless to everyone
- * and the failing query is shown instead. Every other screen still shows the
- * real message, because those are working surfaces where diagnosing a failure
- * matters; here a failure is otherwise reported as a plain status with a route
- * to a human.
+ * two exceptions: the licence key, where a silent blank is useless to
+ * everyone and the failing query is shown instead, and changing password,
+ * where a silent failure would leave someone locked out with no idea why.
+ * Every other screen still shows the real message, because those are
+ * working surfaces where diagnosing a failure matters; here a failure is
+ * otherwise reported as a plain status with a route to a human.
  */
 
 /** Total leads visible to this account. RLS scopes the count. */
@@ -184,6 +185,114 @@ function LicenseKeyBlock({ record }: { record: AccountRecord | null }) {
   );
 }
 
+/**
+ * The other deliberate exception to "Settings shows no raw errors" — see the
+ * file docstring above. A password change that silently failed would leave
+ * someone locked out with no idea why, so this shows the real message rather
+ * than a generic status.
+ */
+function ChangePasswordSection() {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState<FriendlyError | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const clearFeedback = () => {
+    setError(null);
+    setSuccess(false);
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase) {
+      setError({ message: supabaseConfigError ?? 'Supabase is not configured.', hint: null, code: 'CONFIG' });
+      return;
+    }
+
+    const validationError = validateNewPassword(newPassword, confirmPassword);
+    if (validationError) {
+      setError(validationError);
+      setSuccess(false);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    const err = await updatePassword(supabase, newPassword);
+    setSaving(false);
+
+    if (err) {
+      setError(err);
+      return;
+    }
+
+    setNewPassword('');
+    setConfirmPassword('');
+    setSuccess(true);
+  };
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <h3 className="text-sm font-semibold text-slate-900">Change password</h3>
+      <p className="mt-1 text-xs text-slate-600">
+        This is the password you sign in to this dashboard with — separate from the LinkedIn
+        extension key above.
+      </p>
+
+      <form onSubmit={(e) => void onSubmit(e)} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="label">New password</span>
+          <input
+            type="password"
+            className="input mt-1"
+            autoComplete="new-password"
+            required
+            value={newPassword}
+            onChange={(e) => {
+              setNewPassword(e.target.value);
+              clearFeedback();
+            }}
+          />
+        </label>
+        <label className="block">
+          <span className="label">Confirm password</span>
+          <input
+            type="password"
+            className="input mt-1"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              clearFeedback();
+            }}
+          />
+        </label>
+
+        <div className="sm:col-span-2">
+          <button type="submit" className="btn-secondary" disabled={saving}>
+            {saving ? 'Changing…' : 'Change password'}
+          </button>
+        </div>
+      </form>
+
+      {error ? (
+        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+          <p className="font-medium">{error.message}</p>
+          {error.hint ? <p className="mt-1">{error.hint}</p> : null}
+        </div>
+      ) : null}
+
+      {success ? (
+        <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          Password changed.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
@@ -249,6 +358,8 @@ export function SettingsPage() {
           ) : null}
 
           <LicenseKeyBlock record={record} />
+
+          <ChangePasswordSection />
 
           <button
             type="button"

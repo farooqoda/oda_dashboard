@@ -10,6 +10,7 @@ import { LeadsPage } from './pages/LeadsPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OutreachPage } from './pages/OutreachPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SignUpPage } from './pages/SignUpPage';
 
@@ -74,9 +75,15 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public. These are the only routes reachable without a session. */}
+        {/* Public. These are the only routes reachable without a session.
+            /reset-password is here, not behind RequireAuth, on purpose: the
+            recovery link itself signs the browser in, and routing it through
+            the normal gate would resolve that as an ordinary sign-in and
+            drop an already-linked user straight onto the dashboard instead
+            of showing the new-password form — see ResetPasswordPage.tsx. */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Everything else. LeadsProvider mounts inside the gate, so no query
             is ever issued before the user is authenticated. */}
