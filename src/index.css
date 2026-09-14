@@ -56,6 +56,12 @@
   }
 }
 
+/* Search inputs get one custom clear control, not the native one on top of it. */
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Range inputs: one accent colour, no browser default blue. */
 input[type='range'] {
   accent-color: #2a78d6;

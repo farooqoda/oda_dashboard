@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { FilterPanel } from '../components/FilterPanel';
 import { LeadModal } from '../components/modal/LeadModal';
 import {
@@ -21,6 +22,7 @@ import {
   EMPTY_FILTERS,
   filterLeads,
   isFilterActive,
+  isNonSearchFilterActive,
   sortLeads,
   type LeadFilters,
   type SortDirection,
@@ -91,6 +93,14 @@ export function LeadsPage() {
   const { leads, loading, error, refresh, refreshing } = useLeads();
 
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_FILTERS);
+  // The box shows what was typed immediately; `filters.search` — which drives
+  // the memoized filter over every loaded lead — only catches up 275ms after
+  // typing pauses, so a fast typist doesn't re-filter on every keystroke.
+  const [searchInput, setSearchInput] = useState(EMPTY_FILTERS.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 275);
+  useEffect(() => {
+    setFilters((current) => (current.search === debouncedSearch ? current : { ...current, search: debouncedSearch }));
+  }, [debouncedSearch]);
   const [sortKey, setSortKey] = useState<SortKey>('created_at');
   const [direction, setDirection] = useState<SortDirection>('desc');
   const [page, setPage] = useState(1);
@@ -235,15 +245,27 @@ export function LeadsPage() {
       />
 
       <div className="mb-4">
-        <label className="block">
+        <label className="relative block max-w-xl">
           <span className="sr-only">Search leads</span>
           <input
             type="search"
-            className="input max-w-xl"
-            placeholder="Search name, company, title and every value inside traits"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            className="input pr-8"
+            placeholder="Search by name or LinkedIn URL"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
+          {searchInput ? (
+            <button
+              type="button"
+              onClick={() => setSearchInput('')}
+              aria-label="Clear search"
+              className="absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400 hover:text-slate-600"
+            >
+              <span aria-hidden="true" className="text-base leading-none">
+                &times;
+              </span>
+            </button>
+          ) : null}
         </label>
       </div>
 
@@ -271,7 +293,10 @@ export function LeadsPage() {
             leads={leads}
             filters={filters}
             onChange={setFilters}
-            onReset={() => setFilters(EMPTY_FILTERS)}
+            onReset={() => {
+              setFilters(EMPTY_FILTERS);
+              setSearchInput(EMPTY_FILTERS.search);
+            }}
           />
         </div>
 
@@ -285,19 +310,37 @@ export function LeadsPage() {
             </EmptyState>
           ) : sorted.length === 0 ? (
             <EmptyState
-              title="No leads match these filters"
+              title={
+                filters.search.trim() && !isNonSearchFilterActive(filters)
+                  ? 'No leads match your search'
+                  : 'No leads match these filters'
+              }
               action={
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => setFilters(EMPTY_FILTERS)}
+                  onClick={() => {
+                    setFilters(EMPTY_FILTERS);
+                    setSearchInput(EMPTY_FILTERS.search);
+                  }}
                 >
-                  Reset filters
+                  {filters.search.trim() && !isNonSearchFilterActive(filters)
+                    ? 'Clear search'
+                    : 'Reset filters'}
                 </button>
               }
             >
-              {leads.length.toLocaleString()} leads are loaded, but none of them match the current
-              search and filters.
+              {filters.search.trim() ? (
+                <>
+                  No leads match “{filters.search.trim()}”
+                  {isNonSearchFilterActive(filters) ? ' and the current filters' : ''}.
+                </>
+              ) : (
+                <>
+                  {leads.length.toLocaleString()} leads are loaded, but none of them match the
+                  current filters.
+                </>
+              )}
             </EmptyState>
           ) : (
             <div className={refreshing ? 'is-refreshing' : undefined}>

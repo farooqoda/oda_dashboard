@@ -339,6 +339,24 @@ Two other things live in that file and are worth knowing about:
   included) into the search haystack, which is why search on the Leads screen covers traits
   the UI has no display rule for.
 
+### Searching the Leads list
+
+The search box above the table matches `full_name` and `linkedin_url` — type a name or paste
+a profile URL and either finds it — plus `company`, `title` and everything in `traits`, which
+only widens what a query can find. It is case-insensitive, substring, and every whitespace-
+separated term must match somewhere in the haystack (`searchHaystack()` /
+`filterLeads()` in [`selectors.ts`](src/lib/selectors.ts)).
+
+It filters client-side over the leads `LeadsProvider` already has loaded — the same up-to-
+`MAX_ROWS` set every other screen works from — rather than issuing a second, separate
+Supabase query. That is deliberate: this app has exactly one fetch path for `gab_leads`, and
+a search box that queried the database directly would be a second one, with its own latency
+and its own way of going stale. The typed value updates the input immediately; what actually
+drives the filter is debounced by 275ms (`useDebouncedValue()`), so a fast typist doesn't
+re-filter on every keystroke. A search matching nothing gets its own empty state — "No leads
+match your search" — distinct from the generic "no leads match the filter panel" one, with a
+Clear search action; combined with other filters, both are named.
+
 ### Hardcoded vocabularies
 
 The ten ODA buckets and the seven pipeline stages live in
