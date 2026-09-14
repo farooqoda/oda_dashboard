@@ -42,6 +42,32 @@ npm run typecheck   # tsc --noEmit
 npm run preview     # serve the built output
 ```
 
+### Deployment
+
+Built by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) and published with GitHub
+Pages' `actions/deploy-pages`, from `dist/` — never from a checked-in `gh-pages` branch. It
+currently serves from a custom domain at its root (`gab.fisolutionz.com`), which is why the
+three places below all agree on `/`:
+
+* `base` in [`vite.config.ts`](vite.config.ts) — what Vite prefixes onto every built asset URL.
+* `<BrowserRouter basename>` in [`src/main.tsx`](src/main.tsx) — read from
+  `import.meta.env.BASE_URL` rather than repeated as a second literal, specifically so it
+  cannot drift out of sync with `base` the way it once did.
+* The redirect target in [`public/404.html`](public/404.html) — GitHub Pages has no
+  server-side rewrites, so a hard refresh or a shared link on any route other than `/` 404s;
+  this file is what Pages serves for that 404, and it stashes the real path in
+  `sessionStorage` and bounces back to the app root, where the inline script in
+  [`index.html`](index.html) restores it with `history.replaceState`.
+
+If this ever serves from a subpath again (a GitHub Pages project site with no custom domain,
+say — `/oda_dashboard/` rather than `/`), update `base` and the `404.html` redirect target
+together; the router's `basename` follows `base` automatically.
+
+`public/CNAME` (not a repo-root `CNAME`) is what tells Pages which custom domain to serve —
+Vite copies everything in `public/` verbatim into `dist/`, and only what lands in the
+published artifact is what `actions/deploy-pages` actually publishes. A `CNAME` sitting at the
+repo root instead is not deployed and does not configure anything.
+
 ## Authentication
 
 Each person signs in with their own Supabase Auth account. There is no shared key and **no
