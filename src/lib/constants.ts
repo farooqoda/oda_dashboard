@@ -79,3 +79,18 @@ export const DRAFT_REPLY_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-re
  * address your team actually monitors.
  */
 export const SUPPORT_EMAIL = 'support@ontariodigitalacademy.org';
+
+/**
+ * Where a password-reset email sends the user back to. Supabase Auth only
+ * honours a `redirectTo` that is present in this project's own allow-list
+ * (Authentication → URL Configuration → Redirect URLs) — anything else is
+ * silently dropped in favour of the project's default Site URL, with no
+ * error, which is a confusing thing to debug from the app side. Keep this in
+ * sync with that allow-list rather than deriving it from window.location: a
+ * value that happened to work from wherever it was last tested but was never
+ * added to the allow-list would fail silently everywhere else.
+ */
+export const RESET_PASSWORD_REDIRECT_URL = 'https://gab.fisolutionz.com/reset-password';
+
+/** Both password-reset paths — the emailed link and Settings — enforce this. */
+export const MIN_PASSWORD_LENGTH = 8;
