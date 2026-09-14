@@ -341,11 +341,20 @@ Two other things live in that file and are worth knowing about:
 
 ### Searching the Leads list
 
-The search box above the table matches `full_name` and `linkedin_url` — type a name or paste
-a profile URL and either finds it — plus `company`, `title` and everything in `traits`, which
-only widens what a query can find. It is case-insensitive, substring, and every whitespace-
-separated term must match somewhere in the haystack (`searchHaystack()` /
-`filterLeads()` in [`selectors.ts`](src/lib/selectors.ts)).
+The search box above the table matches exactly two fields — `full_name` and `linkedin_url` —
+from the **start of the value**, case-insensitively: typing "j" narrows the list to leads
+whose name or URL *begins with* "j", not every lead that happens to contain one. It is a
+prefix match, not a substring match — the equivalent SQL would be `ILIKE 'term%'`, never
+`ILIKE '%term%'` — so the list narrows on the first keystroke instead of staying wide open
+until most of a distinctive word has been typed. The whole typed term is matched as one
+unit, not split into separate words (`matchesSearch()` / `filterLeads()` in
+[`selectors.ts`](src/lib/selectors.ts)).
+
+Because a real `linkedin_url` always starts with `https://…`, a prefix match on it only finds
+a lead by a URL pasted from its actual beginning (or a leading fragment such as
+`https://www.linkedin.com`) — not by a bare slug like `jane-doe` copied from the middle of the
+address bar. That is the direct, intended consequence of "starts with, not contains anywhere"
+applied to a field whose meaningful part is not at the front of the string, not a bug.
 
 It filters client-side over the leads `LeadsProvider` already has loaded — the same up-to-
 `MAX_ROWS` set every other screen works from — rather than issuing a second, separate
@@ -356,6 +365,17 @@ drives the filter is debounced by 275ms (`useDebouncedValue()`), so a fast typis
 re-filter on every keystroke. A search matching nothing gets its own empty state — "No leads
 match your search" — distinct from the generic "no leads match the filter panel" one, with a
 Clear search action; combined with other filters, both are named.
+
+`company`, `title` and `traits` are not part of this match. They were, briefly — widened in
+an earlier pass on the theory that more fields could only help — but a prefix match on
+`company`/`title` is fine on its own, while a prefix match on the traits search text is not:
+that text is many trait values concatenated into one string, and "starts with" against a
+concatenation only ever matches a prefix of whichever value happens to be joined first,
+which is not what a lead with a matching trait deep in the blob would expect. Reintroducing
+those fields under "starts with" semantics that actually mean something would need each
+trait value checked on its own, not the joined blob — a larger change than this fix, and one
+neither this brief nor the one that first specified the box's contract ("full_name,
+linkedin_url" — never company, title, or traits) ever asked for.
 
 ### Hardcoded vocabularies
 

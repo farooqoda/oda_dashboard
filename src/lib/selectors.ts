@@ -1,6 +1,6 @@
 import { DEFAULT_STAGE, ODA_BUCKETS, PIPELINE_STAGES } from './constants';
 import { dayKey, isProfiled, needsReview, stageOf } from './format';
-import { fitScore, odaBucket, personalityType, traitsSearchText } from './traitsRegistry';
+import { fitScore, odaBucket, personalityType } from './traitsRegistry';
 import type { Lead } from './types';
 
 export const UNBUCKETED = 'Unbucketed';
@@ -259,35 +259,27 @@ export function isFilterActive(filters: LeadFilters): boolean {
 }
 
 /**
- * Search haystack: name and LinkedIn URL are the two fields the search box is
- * specified against — a pasted profile URL must match — plus company, title
- * and every value inside traits, which the box has searched since it shipped
- * and which only widens what a query can find.
+ * The search box's contract is exactly two fields — type a name or paste a
+ * LinkedIn URL — matched from the START of the value, not anywhere inside
+ * it: "J" narrows to leads whose name or URL begins with "J", not every
+ * lead with a "j" in it somewhere. Equivalent to `ILIKE 'term%'` rather than
+ * `ILIKE '%term%'` if this ever moves server-side.
+ *
+ * The full search term is matched as one unit (not split into words), the
+ * same way a single ILIKE pattern would be — "Jane Doe" is a prefix of
+ * "Jane Doe Consulting", not two independent words to hunt for separately.
  */
-function searchHaystack(lead: Lead): string {
-  return [
-    lead.full_name ?? '',
-    lead.linkedin_url ?? '',
-    lead.company ?? '',
-    lead.title ?? '',
-    traitsSearchText(lead.traits),
-  ]
-    .join(' ')
-    .toLowerCase();
+function matchesSearch(lead: Lead, term: string): boolean {
+  const name = (lead.full_name ?? '').toLowerCase();
+  const url = (lead.linkedin_url ?? '').toLowerCase();
+  return name.startsWith(term) || url.startsWith(term);
 }
 
 export function filterLeads(leads: Lead[], filters: LeadFilters): Lead[] {
-  const terms = filters.search
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  const term = filters.search.trim().toLowerCase();
 
   return leads.filter((lead) => {
-    if (terms.length > 0) {
-      const haystack = searchHaystack(lead);
-      if (!terms.every((term) => haystack.includes(term))) return false;
-    }
+    if (term && !matchesSearch(lead, term)) return false;
 
     if (filters.buckets.length > 0 && !filters.buckets.includes(bucketOf(lead))) return false;
 
