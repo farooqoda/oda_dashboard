@@ -239,9 +239,10 @@ export const EMPTY_FILTERS: LeadFilters = {
   hasEmail: 'any',
 };
 
-export function isFilterActive(filters: LeadFilters): boolean {
+/** Every filter except the search box — used to tell "no search results" apart
+ * from "no results after narrowing with the filter panel" in the empty state. */
+export function isNonSearchFilterActive(filters: LeadFilters): boolean {
   return (
-    filters.search.trim() !== '' ||
     filters.buckets.length > 0 ||
     filters.stages.length > 0 ||
     filters.fitMin > 0 ||
@@ -253,10 +254,20 @@ export function isFilterActive(filters: LeadFilters): boolean {
   );
 }
 
-/** Search haystack: name, company, title, and every value inside traits. */
+export function isFilterActive(filters: LeadFilters): boolean {
+  return filters.search.trim() !== '' || isNonSearchFilterActive(filters);
+}
+
+/**
+ * Search haystack: name and LinkedIn URL are the two fields the search box is
+ * specified against — a pasted profile URL must match — plus company, title
+ * and every value inside traits, which the box has searched since it shipped
+ * and which only widens what a query can find.
+ */
 function searchHaystack(lead: Lead): string {
   return [
     lead.full_name ?? '',
+    lead.linkedin_url ?? '',
     lead.company ?? '',
     lead.title ?? '',
     traitsSearchText(lead.traits),
