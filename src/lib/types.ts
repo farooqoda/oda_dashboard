@@ -49,3 +49,21 @@ export type LeadPatch = Partial<
     'stage' | 'connection_status' | 'review_status' | 'conversation_history' | 'reply_draft'
   >
 >;
+
+/** A LinkedIn feed post scraped by the extension's Post Scraper (gab_posts). */
+export interface Post {
+  id: string;
+  client_id: string | null;
+  user_id: string | null;
+  post_url: string;
+  author_name: string | null;
+  author_linkedin_url: string | null;
+  author_title: string | null;
+  post_text: string | null;
+  post_posted_at: string | null;
+  scraped_at: string | null;
+  /** Reserved for the Comment Sender phase. */
+  ai_comment_draft: string | null;
+  comment_status: string | null;
+  comment_posted_at: string | null;
+}
