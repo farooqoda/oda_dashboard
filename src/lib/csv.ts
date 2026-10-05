@@ -1,6 +1,6 @@
 import { fitScore, odaBucket, personalityType } from './traitsRegistry';
 import { stageOf } from './format';
-import type { Lead } from './types';
+import type { Lead, Post } from './types';
 
 function escapeCell(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -47,4 +47,20 @@ export function downloadCsv(filename: string, csv: string): void {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+const POST_COLUMNS: Array<{ header: string; get: (post: Post) => unknown }> = [
+  { header: 'Name', get: (p) => p.author_name },
+  { header: 'Profile URL', get: (p) => p.author_linkedin_url },
+  { header: 'Post URL', get: (p) => p.post_url },
+  { header: 'Profile Headline', get: (p) => p.author_title },
+  { header: 'Post Text', get: (p) => p.post_text },
+  { header: 'Scraped At', get: (p) => p.scraped_at },
+];
+
+/** CSV of scraped posts, in the same column order as the Posts table. */
+export function postsToCsv(posts: Post[]): string {
+  const header = POST_COLUMNS.map((c) => c.header).join(',');
+  const rows = posts.map((post) => POST_COLUMNS.map((c) => escapeCell(c.get(post))).join(','));
+  return [header, ...rows].join('\r\n');
 }

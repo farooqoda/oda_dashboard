@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LeadModal } from '../components/modal/LeadModal';
+import { TaskPicker } from '../components/TaskPicker';
 import {
   Avatar,
   EmptyState,
@@ -129,6 +130,7 @@ export function DashboardPage() {
     return (
       <>
         <PageHeader title="Dashboard" />
+        <TaskPicker />
         <ErrorState error={error} onRetry={refresh} />
       </>
     );
@@ -158,6 +160,8 @@ export function DashboardPage() {
           </button>
         }
       />
+
+      <TaskPicker />
 
       {loading ? (
         <SkeletonStatCards />
