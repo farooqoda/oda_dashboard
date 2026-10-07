@@ -31,7 +31,22 @@ export interface Lead {
   profile_text: string | null;
   created_at: string | null;
   updated_at: string | null;
+  /** Longer AI message for leads you are already connected to (Message Sender). */
+  chat_message?: string | null;
+  chat_status?: ChatStatus | null;
+  chat_owner?: string | null;
+  chat_error?: string | null;
+  /** Automatic sending by the extension (Message Sender). */
+  send_status?: SendStatus | null;
+  send_owner?: string | null;
+  send_channel?: 'invite' | 'message' | null;
+  send_error?: string | null;
+  send_queued_at?: string | null;
+  send_sent_at?: string | null;
 }
+
+export type ChatStatus = 'none' | 'draft_requested' | 'drafting' | 'drafted';
+export type SendStatus = 'none' | 'queued' | 'sending' | 'sent' | 'failed' | 'skipped';
 
 export interface Activity {
   id: number;
@@ -46,7 +61,13 @@ export interface Activity {
 export type LeadPatch = Partial<
   Pick<
     Lead,
-    'stage' | 'connection_status' | 'review_status' | 'conversation_history' | 'reply_draft'
+    | 'stage'
+    | 'connection_status'
+    | 'review_status'
+    | 'conversation_history'
+    | 'reply_draft'
+    | 'invite_message'
+    | 'chat_message'
   >
 >;
 
@@ -95,6 +116,7 @@ export interface CommentPost extends Post {
 export interface CommentSettings {
   user_id: string;
   comment_prompt: string | null;
+  chat_prompt?: string | null;
   comment_language: string;
   daily_limit: number;
 }

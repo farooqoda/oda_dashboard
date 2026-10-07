@@ -56,8 +56,11 @@ export const REVIEW_STATUSES = [
   'On hold',
 ] as const;
 
-/** LinkedIn caps connection-invite notes at 300 characters. */
+/** LinkedIn caps connection-invite notes at 300 characters (Premium). */
 export const INVITE_CHAR_LIMIT = 300;
+
+/** Free LinkedIn accounts only allow 200 characters in an invite note. */
+export const FREE_INVITE_CHAR_LIMIT = 200;
 
 export const PAGE_SIZE = 50;
 
@@ -81,6 +84,16 @@ export const DRAFT_REPLY_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-re
  * Each call drafts up to 8 posts and answers `{ drafted, skipped, failed, remaining }`.
  */
 export const DRAFT_COMMENTS_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-comments';
+
+/**
+ * Writes the longer chat messages (for leads you are already connected to)
+ * for the leads this user marked. Same contract as the comment writer:
+ * `{ user_id }` in, `{ drafted, failed, remaining }` out, 8 leads per call.
+ */
+export const DRAFT_CHAT_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-chat-messages';
+
+/** Upper bound for a chat message the dashboard lets you queue. */
+export const CHAT_CHAR_LIMIT = 2000;
 
 /** LinkedIn's maximum comment length. */
 export const COMMENT_CHAR_LIMIT = 1250;

@@ -11,7 +11,7 @@ export const TASKS = ['post_scraper', 'comment_poster', 'lead_scraper', 'message
 export type Task = (typeof TASKS)[number];
 
 /** Tasks the extension can run today. The others are shown as "coming soon". */
-export const ENABLED_TASKS: readonly Task[] = ['post_scraper', 'comment_poster', 'lead_scraper'];
+export const ENABLED_TASKS: readonly Task[] = ['post_scraper', 'comment_poster', 'lead_scraper', 'message_sender'];
 
 export type ExtensionStatus = 'checking' | 'connected' | 'missing';
 
