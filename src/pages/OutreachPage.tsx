@@ -14,7 +14,7 @@ import {
 } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
-import { CHAT_CHAR_LIMIT, DEFAULT_STAGE, INVITE_CHAR_LIMIT } from '../lib/constants';
+import { CHAT_CHAR_LIMIT, DEFAULT_STAGE, FREE_INVITE_CHAR_LIMIT, INVITE_CHAR_LIMIT } from '../lib/constants';
 import { useExtensionTask } from '../lib/extensionBridge';
 import { displayName, formatDateTime, stageOf } from '../lib/format';
 import {
@@ -168,6 +168,7 @@ function LeadRow({
   const status = sendStatusOf(lead);
   const editable = status === 'none' || status === 'failed' || status === 'skipped';
   const noteOver = note.length > INVITE_CHAR_LIMIT;
+  const noteOverFree = !noteOver && note.length > FREE_INVITE_CHAR_LIMIT;
   const chatOver = chat.length > CHAT_CHAR_LIMIT;
   const chatBusy = lead.chat_status === 'draft_requested' || lead.chat_status === 'drafting';
   const hasLink = /^https:\/\//i.test(lead.linkedin_url || '');
@@ -243,9 +244,10 @@ function LeadRow({
             ) : (
               <p className="whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{note}</p>
             )}
-            <p className={`mt-1 text-right text-[11px] tabular-nums ${noteOver ? 'font-medium text-red-700' : 'text-slate-400'}`}>
+            <p className={`mt-1 text-right text-[11px] tabular-nums ${noteOver ? 'font-medium text-red-700' : noteOverFree ? 'font-medium text-amber-700' : 'text-slate-400'}`}>
               {note.length} / {INVITE_CHAR_LIMIT}
               {noteOver ? ' — over the LinkedIn limit, trim before sending' : ''}
+              {noteOverFree ? ` — free LinkedIn accounts allow only ${FREE_INVITE_CHAR_LIMIT}; without Premium this will fail` : ''}
             </p>
           </div>
 

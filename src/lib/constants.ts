@@ -56,8 +56,11 @@ export const REVIEW_STATUSES = [
   'On hold',
 ] as const;
 
-/** LinkedIn caps connection-invite notes at 300 characters. */
+/** LinkedIn caps connection-invite notes at 300 characters (Premium). */
 export const INVITE_CHAR_LIMIT = 300;
+
+/** Free LinkedIn accounts only allow 200 characters in an invite note. */
+export const FREE_INVITE_CHAR_LIMIT = 200;
 
 export const PAGE_SIZE = 50;
 
