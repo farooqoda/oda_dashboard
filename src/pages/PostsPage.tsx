@@ -178,7 +178,8 @@ export function PostsPage() {
                           <ExternalLink href={post.author_linkedin_url} label="Open" />
                         </td>
                         <td className="px-3 py-2.5">
-                          <ExternalLink href={post.post_url} label="Open" />
+                          {/* Without a captured link the scraper stores LinkedIn's id ("gab-key:…") instead. */}
+                          <ExternalLink href={post.post_url.startsWith('http') ? post.post_url : null} label="Open" />
                         </td>
                         <td className="px-3 py-2.5 text-slate-700">
                           <span className={open ? 'block break-words' : 'line-clamp-2 break-words'} title={post.author_title ?? undefined}>
