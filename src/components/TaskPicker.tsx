@@ -14,13 +14,13 @@ const TASK_INFO: Record<Task, { title: string; description: string; nextStep: st
   },
   lead_scraper: {
     title: 'Lead Scraper',
-    description: 'Sync a LinkedIn profile as a lead and get a personalized invite message.',
-    nextStep: 'Open any LinkedIn profile and press "Sync Full Lead".',
+    description: 'Sync a LinkedIn profile as a lead and get a personalized message. If you are already connected, it is typed into the chat for you — you press Send.',
+    nextStep: 'Open any LinkedIn profile and press "Sync Full Lead". Leads you don\'t message right away wait on the Outreach page.',
   },
   message_sender: {
     title: 'Message Sender',
-    description: 'Send your messages to a list of selected leads.',
-    nextStep: '',
+    description: 'Send your approved outreach to selected leads: connection requests with a note, or chat messages to people you are already connected with.',
+    nextStep: 'Select leads on the Outreach page and press Send, then open LinkedIn and press "Start" in the Message Sender panel.',
   },
 };
 
