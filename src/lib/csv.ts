@@ -52,7 +52,7 @@ export function downloadCsv(filename: string, csv: string): void {
 const POST_COLUMNS: Array<{ header: string; get: (post: Post) => unknown }> = [
   { header: 'Name', get: (p) => p.author_name },
   { header: 'Profile URL', get: (p) => p.author_linkedin_url },
-  { header: 'Post URL', get: (p) => p.post_url },
+  { header: 'Post URL', get: (p) => (p.post_url.startsWith('http') ? p.post_url : '') },
   { header: 'Profile Headline', get: (p) => p.author_title },
   { header: 'Post Text', get: (p) => p.post_text },
   { header: 'Scraped At', get: (p) => p.scraped_at },
