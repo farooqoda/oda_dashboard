@@ -62,8 +62,39 @@ export interface Post {
   post_text: string | null;
   post_posted_at: string | null;
   scraped_at: string | null;
-  /** Reserved for the Comment Sender phase. */
   ai_comment_draft: string | null;
-  comment_status: string | null;
+  comment_status: CommentStatus | null;
   comment_posted_at: string | null;
+}
+
+/** Where a post is in the comment workflow (see gab_comments_schema.sql). */
+export type CommentStatus =
+  | 'pending'
+  | 'draft_requested'
+  | 'drafting'
+  | 'drafted'
+  | 'skipped'
+  | 'queued'
+  | 'posting'
+  | 'posted'
+  | 'failed';
+
+/** A post as the Comments page sees it: the Post plus the comment workflow fields. */
+export interface CommentPost extends Post {
+  comment_owner: string | null;
+  comment_force: boolean | null;
+  comment_skip_reason: string | null;
+  comment_language: string | null;
+  comment_error: string | null;
+  comment_generated_at: string | null;
+  comment_queued_at: string | null;
+  comment_attempts: number | null;
+}
+
+/** The signed-in user's own comment prompt (gab_comment_settings). */
+export interface CommentSettings {
+  user_id: string;
+  comment_prompt: string | null;
+  comment_language: string;
+  daily_limit: number;
 }

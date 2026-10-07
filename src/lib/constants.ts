@@ -75,6 +75,17 @@ export const FIT_MID = 40;
 export const DRAFT_REPLY_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-reply';
 
 /**
+ * Writes AI comments for the posts this user marked "draft_requested". It is
+ * given only `{ user_id }`; which posts to draft was already decided through
+ * Supabase (Row Level Security), so this call cannot create work by itself.
+ * Each call drafts up to 8 posts and answers `{ drafted, skipped, failed, remaining }`.
+ */
+export const DRAFT_COMMENTS_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-comments';
+
+/** LinkedIn's maximum comment length. */
+export const COMMENT_CHAR_LIMIT = 1250;
+
+/**
  * Shown on Settings and wherever the user needs a human. Change this to the
  * address your team actually monitors.
  */

@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { AuthProvider } from './data/AuthProvider';
 import { LeadsProvider } from './data/LeadsProvider';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { CommentsPage } from './pages/CommentsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { LoginPage } from './pages/LoginPage';
@@ -63,6 +64,7 @@ function Shell() {
             <Route path="/leads" element={<LeadsPage />} />
             <Route path="/outreach" element={<OutreachPage />} />
             <Route path="/posts" element={<PostsPage />} />
+            <Route path="/comments" element={<CommentsPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />
