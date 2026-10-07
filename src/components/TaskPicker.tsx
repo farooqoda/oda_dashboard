@@ -9,8 +9,8 @@ const TASK_INFO: Record<Task, { title: string; description: string; nextStep: st
   },
   comment_poster: {
     title: 'Comment Poster',
-    description: 'Post AI-drafted comments on the posts you scraped.',
-    nextStep: '',
+    description: 'Post the AI comments you approved on the Comments page, one at a time with safe pauses.',
+    nextStep: 'Approve comments on the Comments page, then open LinkedIn and press "Start" in the Comment Poster panel.',
   },
   lead_scraper: {
     title: 'Lead Scraper',
@@ -27,7 +27,7 @@ const TASK_INFO: Record<Task, { title: string; description: string; nextStep: st
 const ORDER: Task[] = ['post_scraper', 'comment_poster', 'lead_scraper', 'message_sender'];
 
 export function TaskPicker() {
-  const { status, task, pending, chooseTask, recheck } = useExtensionTask();
+  const { status, task, pending, refused, chooseTask, recheck } = useExtensionTask();
   const active = status === 'connected' ? task : null;
 
   return (
@@ -55,6 +55,13 @@ export function TaskPicker() {
           The GAB extension (v4.16 or newer) is not running in this browser. Install or enable it in
           Tampermonkey, then reload this page. Tasks are saved in the extension, so pick them in the
           same browser you use for LinkedIn.
+        </p>
+      ) : null}
+
+      {refused ? (
+        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+          Your extension did not accept "{TASK_INFO[refused].title}". It is probably an older version —
+          install the latest GAB LinkedIn Assistant in Tampermonkey, then reload this page.
         </p>
       ) : null}
 

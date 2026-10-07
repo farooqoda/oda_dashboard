@@ -11,7 +11,7 @@ export const TASKS = ['post_scraper', 'comment_poster', 'lead_scraper', 'message
 export type Task = (typeof TASKS)[number];
 
 /** Tasks the extension can run today. The others are shown as "coming soon". */
-export const ENABLED_TASKS: readonly Task[] = ['post_scraper', 'lead_scraper'];
+export const ENABLED_TASKS: readonly Task[] = ['post_scraper', 'comment_poster', 'lead_scraper'];
 
 export type ExtensionStatus = 'checking' | 'connected' | 'missing';
 
@@ -60,10 +60,20 @@ export function useExtensionTask() {
     };
   }, []);
 
+  const [refused, setRefused] = useState<Task | null>(null);
+
   const chooseTask = useCallback((next: Task) => {
     if (!ENABLED_TASKS.includes(next)) return;
     setPending(next);
+    setRefused(null);
     window.postMessage({ source: 'gab-dashboard', type: 'set-mode', mode: next }, window.location.origin);
+    // An older extension ignores tasks it does not know; do not spin forever.
+    window.setTimeout(() => {
+      setPending((current) => {
+        if (current === next) setRefused(next);
+        return current === next ? null : current;
+      });
+    }, 2500);
   }, []);
 
   const recheck = useCallback(() => {
@@ -75,5 +85,5 @@ export function useExtensionTask() {
     }, DETECT_TIMEOUT_MS);
   }, []);
 
-  return { status, task, version, pending, chooseTask, recheck };
+  return { status, task, version, pending, refused, chooseTask, recheck };
 }
