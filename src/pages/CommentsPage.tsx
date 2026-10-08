@@ -58,8 +58,16 @@ function statusOf(p: CommentPost): CommentStatus {
 // ---------------------------------------------------------------------------
 // Prompt & language
 // ---------------------------------------------------------------------------
-function PromptPanel({ userId, clientId }: { userId: string; clientId: string | null }) {
-  const [open, setOpen] = useState(false);
+export function CommentPromptPanel({
+  userId,
+  clientId,
+  defaultOpen = false,
+}: {
+  userId: string;
+  clientId: string | null;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [prompt, setPrompt] = useState('');
   const [language, setLanguage] = useState('auto');
   const [limit, setLimit] = useState(DEFAULT_DAILY_LIMIT);
@@ -201,20 +209,43 @@ function CommentRow({
   const over = text.length > COMMENT_CHAR_LIMIT;
   const canPost = editable && link && text.trim().length > 0 && !over;
   const postText = post.post_text?.trim() ?? '';
+  const whyNot = !editable
+    ? null
+    : !link
+      ? 'No post link — the extension cannot open this post.'
+      : !text.trim()
+        ? 'Write a comment first.'
+        : over
+          ? 'Too long for LinkedIn.'
+          : null;
+
+  // Clicking anywhere on the card selects it, except on links, buttons and the text box.
+  const onCardClick = (e: React.MouseEvent) => {
+    if (!editable || !canPost || busy) return;
+    if ((e.target as HTMLElement).closest('a, button, textarea, input, select, label')) return;
+    onToggle();
+  };
 
   return (
-    <article className="card p-4">
+    <article
+      className={`card p-4 ${editable && canPost ? 'cursor-pointer' : ''} ${
+        selected ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-500' : ''
+      }`}
+      onClick={onCardClick}
+      aria-selected={editable ? selected : undefined}
+    >
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* The post */}
         <div className="min-w-0 lg:w-[42%] lg:shrink-0">
           <div className="flex items-start gap-3">
-            {status === 'drafted' ? (
+            {editable ? (
               <input
                 type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-slate-400 text-brand-600 focus:ring-brand-500 disabled:cursor-not-allowed"
                 checked={selected}
                 onChange={onToggle}
-                disabled={!canPost}
+                disabled={!canPost || busy}
+                title={whyNot ?? undefined}
                 aria-label={`Select comment for ${post.author_name ?? 'this post'}`}
               />
             ) : null}
@@ -288,6 +319,10 @@ function CommentRow({
             <p className="mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
               {post.comment_error}
             </p>
+          ) : null}
+
+          {whyNot ? (
+            <p className="mb-2 text-xs font-medium text-amber-800">Can't be selected: {whyNot}</p>
           ) : null}
 
           {editable ? (
@@ -465,7 +500,7 @@ export function CommentsPage() {
     [edits],
   );
 
-  const selectableInView = visible.filter((p) => statusOf(p) === 'drafted' && postable(p));
+  const selectableInView = visible.filter((p) => ['drafted', 'failed'].includes(statusOf(p)) && postable(p));
   const selectedInView = selectableInView.filter((p) => selected.has(p.id));
 
   const withBusy = async (ids: string[], fn: () => Promise<{ error: FriendlyError | null }>) => {
@@ -570,7 +605,7 @@ export function CommentsPage() {
         }
       />
 
-      <PromptPanel userId={userId} clientId={clientId} />
+      <CommentPromptPanel userId={userId} clientId={clientId} />
 
       {drafting ? (
         <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
@@ -624,13 +659,13 @@ export function CommentsPage() {
         ))}
       </div>
 
-      {tab === 'review' && selectableInView.length > 0 ? (
+      {(tab === 'review' || tab === 'failed') && selectableInView.length > 0 ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-              checked={selectedInView.length === selectableInView.length}
+              checked={selectedInView.length > 0 && selectedInView.length === selectableInView.length}
               onChange={(e) =>
                 setSelected(e.target.checked ? new Set(selectableInView.map((p) => p.id)) : new Set())
               }

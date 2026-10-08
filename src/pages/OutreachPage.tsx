@@ -14,7 +14,9 @@ import {
 } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
-import { CHAT_CHAR_LIMIT, DEFAULT_STAGE, FREE_INVITE_CHAR_LIMIT, INVITE_CHAR_LIMIT } from '../lib/constants';
+import { CHAT_CHAR_LIMIT, DEFAULT_STAGE } from '../lib/constants';
+import { useInviteLimit } from '../lib/prompts';
+import { Link } from 'react-router-dom';
 import { useExtensionTask } from '../lib/extensionBridge';
 import { displayName, formatDateTime, stageOf } from '../lib/format';
 import {
@@ -103,7 +105,7 @@ function ChatPromptPanel({ userId, clientId, inviteQuota }: { userId: string; cl
           </label>
           <p className="text-xs text-slate-500">
             Who you are, what you offer, the tone, how to sign off. Any length. The AI also reads the lead's
-            profile and profiling notes. Connection notes keep coming from the profiling pipeline as today.
+            profile and profiling notes. Connection notes are written by the Lead Scraper from your prompt on the Prompts page.
           </p>
           <textarea
             id="chat-prompt"
@@ -151,6 +153,7 @@ function LeadRow({
   onBlurChat,
   onToggle,
   onAction,
+  inviteLimit,
 }: {
   lead: Lead;
   note: string;
@@ -164,11 +167,11 @@ function LeadRow({
   onBlurChat: () => void;
   onToggle: () => void;
   onAction: (a: RowAction) => void;
+  inviteLimit: number;
 }) {
   const status = sendStatusOf(lead);
   const editable = status === 'none' || status === 'failed' || status === 'skipped';
-  const noteOver = note.length > INVITE_CHAR_LIMIT;
-  const noteOverFree = !noteOver && note.length > FREE_INVITE_CHAR_LIMIT;
+  const noteOver = note.length > inviteLimit;
   const chatOver = chat.length > CHAT_CHAR_LIMIT;
   const chatBusy = lead.chat_status === 'draft_requested' || lead.chat_status === 'drafting';
   const hasLink = /^https:\/\//i.test(lead.linkedin_url || '');
@@ -244,10 +247,14 @@ function LeadRow({
             ) : (
               <p className="whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{note}</p>
             )}
-            <p className={`mt-1 text-right text-[11px] tabular-nums ${noteOver ? 'font-medium text-red-700' : noteOverFree ? 'font-medium text-amber-700' : 'text-slate-400'}`}>
-              {note.length} / {INVITE_CHAR_LIMIT}
-              {noteOver ? ' — over the LinkedIn limit, trim before sending' : ''}
-              {noteOverFree ? ` — free LinkedIn accounts allow only ${FREE_INVITE_CHAR_LIMIT}; without Premium this will fail` : ''}
+            <p className={`mt-1 text-right text-[11px] tabular-nums ${noteOver ? 'font-medium text-red-700' : 'text-slate-400'}`}>
+              {note.length} / {inviteLimit}
+              {noteOver ? (
+                <>
+                  {' '}— too long for your LinkedIn account. Shorten it, or set Premium on the{' '}
+                  <Link to="/prompts" className="underline">Prompts</Link> page.
+                </>
+              ) : null}
             </p>
           </div>
 
@@ -315,6 +322,7 @@ export function OutreachPage() {
   const { leads, loading, error, refresh, refreshing, updateLead } = useLeads();
   const { user, clientId } = useAuth();
   const userId = user?.id ?? null;
+  const inviteLimit = useInviteLimit(userId);
   const extension = useExtensionTask();
 
   const [tab, setTab] = useState<TabKey>('send');
@@ -353,11 +361,11 @@ export function OutreachPage() {
         ['none', 'failed', 'skipped'].includes(st) &&
         /^https:\/\//i.test(l.linkedin_url || '') &&
         note.length > 0 &&
-        note.length <= INVITE_CHAR_LIMIT &&
+        note.length <= inviteLimit &&
         chat.length <= CHAT_CHAR_LIMIT
       );
     },
-    [notes, chats],
+    [notes, chats, inviteLimit],
   );
 
   const selectableInView = visible.filter(sendable);
@@ -621,6 +629,7 @@ export function OutreachPage() {
                 })
               }
               onAction={(a) => void onAction(l, a)}
+              inviteLimit={inviteLimit}
             />
           ))}
         </div>
