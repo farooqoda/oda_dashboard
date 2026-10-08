@@ -24,6 +24,26 @@ const TASK_INFO: Record<Task, { title: string; description: string; nextStep: st
   },
 };
 
+// Each task keeps one colour everywhere on its card, so the four are told apart at a glance.
+const TASK_TONE: Record<Task, { bar: string; ring: string; badge: string; button: string; note: string }> = {
+  post_scraper: {
+    bar: 'border-t-teal-500', ring: 'border-teal-500 ring-1 ring-teal-500', badge: 'bg-teal-50 text-teal-800',
+    button: 'border-teal-600 bg-teal-600 text-white hover:bg-teal-700', note: 'bg-teal-50 text-teal-900',
+  },
+  comment_poster: {
+    bar: 'border-t-violet-500', ring: 'border-violet-500 ring-1 ring-violet-500', badge: 'bg-violet-50 text-violet-800',
+    button: 'border-violet-600 bg-violet-600 text-white hover:bg-violet-700', note: 'bg-violet-50 text-violet-900',
+  },
+  lead_scraper: {
+    bar: 'border-t-brand-500', ring: 'border-brand-500 ring-1 ring-brand-500', badge: 'bg-brand-50 text-brand-800',
+    button: 'border-brand-600 bg-brand-600 text-white hover:bg-brand-700', note: 'bg-brand-50 text-brand-900',
+  },
+  message_sender: {
+    bar: 'border-t-orange-500', ring: 'border-orange-500 ring-1 ring-orange-500', badge: 'bg-orange-50 text-orange-800',
+    button: 'border-orange-600 bg-orange-600 text-white hover:bg-orange-700', note: 'bg-orange-50 text-orange-900',
+  },
+};
+
 const ORDER: Task[] = ['post_scraper', 'comment_poster', 'lead_scraper', 'message_sender'];
 
 export function TaskPicker() {
@@ -71,17 +91,18 @@ export function TaskPicker() {
           const enabled = ENABLED_TASKS.includes(key);
           const isActive = active === key;
           const isPending = pending === key;
+          const tone = TASK_TONE[key];
           return (
             <div
               key={key}
-              className={`card flex flex-col p-4 ${
-                isActive ? 'border-brand-500 ring-1 ring-brand-500' : ''
-              } ${enabled ? '' : 'opacity-60'}`}
+              className={`card flex flex-col border-t-4 p-4 ${tone.bar} ${isActive ? tone.ring : ''} ${
+                enabled ? '' : 'opacity-60'
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <h3 className="text-sm font-semibold text-slate-900">{info.title}</h3>
+                <h3 className="text-base font-semibold text-ink">{info.title}</h3>
                 {isActive ? (
-                  <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-800">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tone.badge}`}>
                     Active
                   </span>
                 ) : !enabled ? (
@@ -92,17 +113,17 @@ export function TaskPicker() {
               </div>
               <p className="mt-1.5 flex-1 text-xs leading-relaxed text-slate-600">{info.description}</p>
               {isActive && info.nextStep ? (
-                <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-700">
+                <p className={`mt-3 rounded-md px-3 py-2 text-xs leading-relaxed ${tone.note}`}>
                   {info.nextStep}
                 </p>
               ) : null}
               <div className="mt-3">
                 {isActive ? (
-                  <span className="text-xs font-medium text-brand-700">Selected ✓</span>
+                  <span className="text-xs font-medium text-ink">Selected ✓</span>
                 ) : (
                   <button
                     type="button"
-                    className="btn-secondary w-full"
+                    className={`btn w-full ${tone.button}`}
                     disabled={!enabled || status !== 'connected' || isPending}
                     onClick={() => chooseTask(key)}
                     title={

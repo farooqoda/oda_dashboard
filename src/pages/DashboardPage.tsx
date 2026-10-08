@@ -12,7 +12,7 @@ import {
   PageHeader,
 } from '../components/ui';
 import { useLeads } from '../data/LeadsProvider';
-import { displayName, formatDate, pluralise, stageOf } from '../lib/format';
+import { displayName, formatDate, pluralise, stageOf, stagePillClass } from '../lib/format';
 import { dashboardStats, stageCounts } from '../lib/selectors';
 import { personalityType } from '../lib/traitsRegistry';
 import type { Lead } from '../lib/types';
@@ -266,11 +266,11 @@ export function DashboardPage() {
                 const cards = byStage.get(row.stage) ?? [];
                 return (
                   <section key={row.stage} className="w-72 shrink-0">
-                    <header className="mb-3 flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2">
-                      <h3 className="truncate text-sm font-medium text-slate-800" title={row.stage}>
+                    <header className={`mb-3 flex items-center justify-between rounded-md border px-3 py-2 ${stagePillClass(row.stage)}`}>
+                      <h3 className="truncate text-sm font-semibold" title={row.stage}>
                         {row.stage}
                       </h3>
-                      <span className="text-xs font-semibold tabular-nums text-slate-500">
+                      <span className="text-xs font-semibold tabular-nums opacity-80">
                         {cards.length}
                       </span>
                     </header>

@@ -32,7 +32,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 /** Shown while a persisted session is restored — a skeleton, never a spinner. */
 function BootScreen() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-ink">
       <div className="mx-auto max-w-md px-4 py-24">
         <div className="card p-6">
           <div className="skeleton h-3 w-32" />

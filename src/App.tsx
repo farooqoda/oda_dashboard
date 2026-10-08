@@ -25,7 +25,7 @@ function Shell() {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-canvas">
       {/* Fixed sidebar from md up. */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 md:block">
         <Sidebar />
@@ -35,7 +35,7 @@ function Shell() {
       {mobileNavOpen ? (
         <div className="fixed inset-0 z-40 md:hidden">
           <div
-            className="absolute inset-0 bg-slate-900/40"
+            className="absolute inset-0 bg-ink/50"
             onClick={() => setMobileNavOpen(false)}
             aria-hidden="true"
           />
@@ -46,16 +46,16 @@ function Shell() {
       ) : null}
 
       <div className="md:pl-60">
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+        <header className="sticky top-0 z-20 flex items-center gap-3 bg-ink px-4 py-3 md:hidden">
           <button
             type="button"
-            className="btn-secondary"
+            className="btn border-white/25 bg-white/10 text-white hover:bg-white/20"
             onClick={() => setMobileNavOpen(true)}
             aria-label="Open navigation"
           >
             Menu
           </button>
-          <span className="text-sm font-semibold text-slate-900">LinkedIn outreach</span>
+          <span className="brand-title text-xl">LinkedIn Outreach</span>
         </header>
 
         <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
