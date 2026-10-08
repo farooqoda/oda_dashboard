@@ -25,7 +25,9 @@ import {
   loadInviteQuota,
   queueLeads,
   requestChatMessages,
+  requestInviteNotes,
   runChatBatch,
+  runInviteBatch,
   saveChatPrompt,
 } from '../lib/messages';
 import { personalityType } from '../lib/traitsRegistry';
@@ -138,7 +140,7 @@ function ChatPromptPanel({ userId, clientId, inviteQuota }: { userId: string; cl
 // ---------------------------------------------------------------------------
 // One lead
 // ---------------------------------------------------------------------------
-type RowAction = 'send' | 'cancel' | 'chat' | 'contacted' | 'details';
+type RowAction = 'send' | 'cancel' | 'chat' | 'invite' | 'contacted' | 'details';
 
 function LeadRow({
   lead,
@@ -172,6 +174,7 @@ function LeadRow({
   const status = sendStatusOf(lead);
   const editable = status === 'none' || status === 'failed' || status === 'skipped';
   const noteOver = note.length > inviteLimit;
+  const inviteBusy = lead.invite_status === 'draft_requested' || lead.invite_status === 'drafting';
   const chatOver = chat.length > CHAT_CHAR_LIMIT;
   const chatBusy = lead.chat_status === 'draft_requested' || lead.chat_status === 'drafting';
   const hasLink = /^https:\/\//i.test(lead.linkedin_url || '');
@@ -235,8 +238,19 @@ function LeadRow({
           ) : null}
 
           <div>
-            <p className="label mb-1">Connection note (not connected yet)</p>
-            {editable ? (
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <p className="label">Connection note (not connected yet)</p>
+              {editable ? (
+                <button type="button" className={`btn-ghost px-2 py-1 text-xs ${noteOver ? 'font-semibold text-red-700' : ''}`}
+                  disabled={busy || inviteBusy} onClick={() => onAction('invite')}>
+                  {inviteBusy ? 'AI is writing…' : noteOver ? '✂ Shorten with AI' : '↻ Rewrite with AI'}
+                </button>
+              ) : null}
+            </div>
+            {lead.invite_error && !inviteBusy ? (
+              <p className="mb-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-900">{lead.invite_error}</p>
+            ) : null}
+            {editable && !inviteBusy ? (
               <textarea
                 className={`input min-h-[84px] leading-relaxed ${noteOver ? 'border-red-400' : ''}`}
                 value={note}
@@ -333,6 +347,8 @@ export function OutreachPage() {
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const [actionError, setActionError] = useState<FriendlyError | null>(null);
   const [writing, setWriting] = useState<{ done: number; remaining: number } | null>(null);
+  const [noteWriting, setNoteWriting] = useState<{ done: number; remaining: number } | null>(null);
+  const noteWritingRef = useRef(false);
   const [queuedNotice, setQueuedNotice] = useState<number | null>(null);
   const [inviteQuota, setInviteQuota] = useState<number | null>(null);
   const writingRef = useRef(false);
@@ -410,6 +426,70 @@ export function OutreachPage() {
     refresh();
   }, [userId, refresh]);
 
+  const runNoteWriting = useCallback(async () => {
+    if (!userId || noteWritingRef.current) return;
+    noteWritingRef.current = true;
+    let done = 0;
+    setNoteWriting({ done: 0, remaining: 0 });
+    for (let round = 0; round < 100; round++) {
+      const res = await runInviteBatch(userId);
+      if (res.error) {
+        setActionError(res.error);
+        break;
+      }
+      done += res.data.drafted + res.data.failed;
+      setNoteWriting({ done, remaining: res.data.remaining });
+      refresh();
+      if (res.data.remaining === 0) break;
+      if (res.data.drafted + res.data.failed === 0) await new Promise((r) => window.setTimeout(r, 3000));
+    }
+    setNoteWriting(null);
+    noteWritingRef.current = false;
+    refresh();
+  }, [userId, refresh]);
+
+  const writeNotes = async (items: Lead[]) => {
+    if (!userId || items.length === 0) return;
+    setActionError(null);
+    const ids = items.map((l) => l.id);
+    markBusy(ids, true);
+    for (const l of items) {
+      const err = await saveTexts(l); // the AI works on what you see
+      if (err) {
+        setActionError(err);
+        markBusy(ids, false);
+        return;
+      }
+    }
+    setNotes((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => delete next[id]);
+      return next;
+    });
+    const res = await requestInviteNotes(ids, userId);
+    markBusy(ids, false);
+    if (res.error) setActionError(res.error);
+    else {
+      refresh();
+      void runNoteWriting();
+    }
+  };
+
+  // Notes the AI was still working on when the page was closed: carry on.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current || !userId || leads.length === 0) return;
+    resumedRef.current = true;
+    if (leads.some((l) => l.invite_owner === userId && (l.invite_status === 'draft_requested' || l.invite_status === 'drafting'))) {
+      void runNoteWriting();
+    }
+  }, [leads, userId, runNoteWriting]);
+
+  const tooLong = useMemo(
+    () => leads.filter((l) => ['none', 'failed', 'skipped'].includes(sendStatusOf(l)) && l.invite_status !== 'drafting' && l.invite_status !== 'draft_requested' && (notes[l.id] ?? l.invite_message ?? '').length > inviteLimit),
+    [leads, notes, inviteLimit],
+  );
+
   const writeChats = async (items: Lead[]) => {
     if (!userId || items.length === 0) return;
     setActionError(null);
@@ -468,6 +548,7 @@ export function OutreachPage() {
     if (action === 'details') return setOpenId(l.id);
     if (action === 'send') return send([l]);
     if (action === 'chat') return writeChats([l]);
+    if (action === 'invite') return writeNotes([l]);
     if (action === 'cancel') {
       markBusy([l.id], true);
       const res = await cancelQueuedLeads([l.id]);
@@ -510,6 +591,21 @@ export function OutreachPage() {
       />
 
       {userId ? <ChatPromptPanel userId={userId} clientId={clientId} inviteQuota={inviteQuota} /> : null}
+
+      {noteWriting ? (
+        <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
+          The AI is writing connection notes… {noteWriting.done} done{noteWriting.remaining ? `, ${noteWriting.remaining} to go` : ''}.
+        </p>
+      ) : tooLong.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <span>
+            {tooLong.length} connection {tooLong.length === 1 ? 'note is' : 'notes are'} longer than your LinkedIn limit of {inviteLimit} characters, so {tooLong.length === 1 ? 'it' : 'they'} can't be sent.
+          </span>
+          <button type="button" className="btn border-red-700 bg-red-700 text-white hover:bg-red-800" onClick={() => void writeNotes(tooLong)}>
+            ✂ Shorten {tooLong.length === 1 ? 'it' : `all ${tooLong.length}`} with AI
+          </button>
+        </div>
+      ) : null}
 
       {writing ? (
         <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">

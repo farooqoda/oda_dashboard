@@ -91,6 +91,7 @@ export const DRAFT_COMMENTS_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft
  * `{ user_id }` in, `{ drafted, failed, remaining }` out, 8 leads per call.
  */
 export const DRAFT_CHAT_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-chat-messages';
+export const DRAFT_INVITE_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-invite-notes';
 
 /** Upper bound for a chat message the dashboard lets you queue. */
 export const CHAT_CHAR_LIMIT = 2000;
