@@ -14,11 +14,11 @@ export function AuthLayout({
   footer?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-ink px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <p className="text-sm font-semibold text-slate-900">LinkedIn outreach</p>
-          <p className="mt-0.5 text-xs text-slate-500">Ontario Digital Academy</p>
+        <div className="mb-7 text-center">
+          <p className="brand-title text-4xl">LinkedIn Outreach</p>
+          <p className="mt-2 text-sm text-ink-300">Ontario Digital Academy</p>
         </div>
 
         <div className="card p-6">
@@ -27,7 +27,7 @@ export function AuthLayout({
           <div className="mt-5">{children}</div>
         </div>
 
-        {footer ? <div className="mt-4 text-center text-sm text-slate-600">{footer}</div> : null}
+        {footer ? <div className="auth-footer mt-4 text-center text-sm text-ink-200">{footer}</div> : null}
       </div>
     </div>
   );

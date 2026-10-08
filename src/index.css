@@ -8,7 +8,7 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-canvas text-slate-900 antialiased;
     font-family: theme('fontFamily.sans');
   }
 
@@ -20,7 +20,7 @@
 @layer components {
   /* One card treatment everywhere: white, hairline border, no drop shadow. */
   .card {
-    @apply rounded-card border border-slate-200 bg-white;
+    @apply rounded-card border border-line bg-white;
   }
 
   .pill {
@@ -47,6 +47,10 @@
     @apply w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500;
   }
 
+  .brand-title {
+    @apply font-display font-extrabold leading-none tracking-tight text-sun-500;
+  }
+
   .label {
     @apply text-xs font-medium uppercase tracking-wide text-slate-500;
   }
@@ -54,6 +58,11 @@
   .skeleton {
     @apply animate-pulse rounded bg-slate-200;
   }
+}
+
+/* Links under the sign-in card sit on navy. */
+.auth-footer a {
+  @apply font-medium text-sun-300 hover:text-sun-400;
 }
 
 /* Search inputs get one custom clear control, not the native one on top of it. */

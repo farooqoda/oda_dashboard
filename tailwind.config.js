@@ -4,6 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        // Brand name and page titles only; data stays in the system face.
+        display: ['"Bricolage Grotesque Variable"', 'system-ui', 'sans-serif'],
         sans: [
           'system-ui',
           '-apple-system',
@@ -29,6 +31,11 @@ export default {
           800: '#184f95',
           900: '#0d366b',
         },
+        // Frame: deep navy sidebar, maple-gold brand mark, sky-tinted canvas.
+        ink: { DEFAULT: '#0E2747', 800: '#16365E', 700: '#21477A', 300: '#9FB6D6', 200: '#C9D7EA' },
+        sun: { 300: '#FAC96B', 400: '#F7B43A', 500: '#F5A524' },
+        canvas: '#EEF4FB',
+        line: '#D6E3F3',
         // Semantic colours. Fixed status palette — never reused for series identity.
         good: '#0ca30c',
         warning: '#fab219',

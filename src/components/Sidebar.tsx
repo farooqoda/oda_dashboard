@@ -17,11 +17,11 @@ const NAV = [
 function Count({ label, value, loading }: { label: string; value: number; loading: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className="text-xs text-slate-500">{label}</span>
+      <span className="text-xs text-ink-300">{label}</span>
       {loading ? (
-        <span className="skeleton h-3 w-8" />
+        <span className="h-3 w-8 animate-pulse rounded bg-white/15" />
       ) : (
-        <span className="text-xs font-semibold tabular-nums text-slate-800">
+        <span className="text-sm font-semibold tabular-nums text-white">
           {value.toLocaleString()}
         </span>
       )}
@@ -43,13 +43,17 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   return (
-    <div className="flex h-full flex-col border-r border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <p className="text-sm font-semibold text-slate-900">LinkedIn outreach</p>
-        <p className="mt-0.5 text-xs text-slate-500">Ontario Digital Academy</p>
+    <div className="flex h-full flex-col bg-ink text-ink-200">
+      <div className="px-5 pb-5 pt-6">
+        <p className="brand-title text-[1.85rem]">
+          LinkedIn
+          <br />
+          Outreach
+        </p>
+        <p className="mt-2 text-xs font-medium text-ink-300">Ontario Digital Academy</p>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-0.5 border-t border-white/10 px-3 py-4">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
@@ -57,10 +61,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             end={item.end}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              `block rounded-md border-l-[3px] px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-offset-ink ${
                 isActive
-                  ? 'bg-brand-50 text-brand-800'
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'border-sun-500 bg-white/10 text-white'
+                  : 'border-transparent text-ink-200 hover:bg-white/5 hover:text-white'
               }`
             }
           >
@@ -69,21 +73,21 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
-      <div className="space-y-2 border-t border-slate-200 px-5 py-4">
+      <div className="space-y-2 border-t border-white/10 px-5 py-4">
         <Count label="Total leads" value={leads.length} loading={loading} />
         <Count label="Pending outreach" value={pending} loading={loading} />
         <Count label="Replied or further" value={replied} loading={loading} />
       </div>
 
-      <div className="border-t border-slate-200 px-5 py-3">
+      <div className="border-t border-white/10 px-5 py-3">
         {user?.email ? (
-          <p className="truncate text-xs text-slate-600" title={user.email}>
+          <p className="truncate text-xs text-ink-300" title={user.email}>
             {user.email}
           </p>
         ) : null}
         <button
           type="button"
-          className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          className="mt-2 w-full rounded-md border border-white/25 bg-transparent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
           onClick={() => void handleSignOut()}
           disabled={signingOut}
         >
