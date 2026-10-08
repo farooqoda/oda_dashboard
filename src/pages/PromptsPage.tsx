@@ -200,7 +200,8 @@ function LeadPromptSets({ userId, clientId, inviteLimit }: { userId: string; cli
           </button>
           {!sets.length ? (
             <p className="mt-3 text-xs leading-relaxed text-slate-600">
-              No prompt sets yet. Until you save one, the Lead Scraper keeps using the prompt it uses today.
+              No prompt sets yet. Until you save one, the Lead Scraper uses your team's prompt set, or a built-in
+              default if nobody has one. Copy your old Google Sheet prompt here to keep using it.
             </p>
           ) : !activeId ? (
             <p className="mt-3 text-xs leading-relaxed text-amber-800">

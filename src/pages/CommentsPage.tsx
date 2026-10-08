@@ -212,7 +212,7 @@ function CommentRow({
   const whyNot = !editable
     ? null
     : !link
-      ? 'No post link — the extension cannot open this post.'
+      ? 'No post link, so the extension cannot open this post. Scrape it again with the updated extension to add its link.'
       : !text.trim()
         ? 'Write a comment first.'
         : over
