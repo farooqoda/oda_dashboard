@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLeads } from '../../data/LeadsProvider';
 import { useAuth } from '../../data/AuthProvider';
-import { CONNECTION_STATUSES, INVITE_CHAR_LIMIT, REVIEW_STATUSES } from '../../lib/constants';
+import { CONNECTION_STATUSES, REVIEW_STATUSES } from '../../lib/constants';
+import { useInviteLimit } from '../../lib/prompts';
 import { requestReplyDraft } from '../../lib/draftReply';
 import { prettifyKey, traitBool, traitString } from '../../lib/traitsRegistry';
 import type { FriendlyError } from '../../lib/supabase';
@@ -108,7 +109,7 @@ function siblingSubject(lead: Lead, key: string): string | null {
  * Columns first, then traits; identical bodies are shown once, because a
  * pipeline that writes to both would otherwise render the message twice.
  */
-function discoverMessages(lead: Lead, shownKeys: Set<string>, shownBodies: Set<string>): FoundMessage[] {
+function discoverMessages(lead: Lead, shownKeys: Set<string>, shownBodies: Set<string>, inviteLimit: number): FoundMessage[] {
   const fields: Array<[string, unknown]> = [
     ...Object.entries(lead as unknown as Record<string, unknown>),
     ...Object.entries(lead.traits ?? {}),
@@ -133,8 +134,8 @@ function discoverMessages(lead: Lead, shownKeys: Set<string>, shownBodies: Set<s
       label: prettifyKey(key),
       subject: siblingSubject(lead, key),
       body,
-      // Anything sent as a connection note is bound by the same 300 characters.
-      limit: /invite|connection/i.test(key) ? INVITE_CHAR_LIMIT : undefined,
+      // Anything sent as a connection note is bound by the same note limit.
+      limit: /invite|connection/i.test(key) ? inviteLimit : undefined,
     });
   }
 
@@ -491,6 +492,8 @@ export function OutreachTab({
   onPatch: (patch: LeadPatch) => void;
   saving: boolean;
 }) {
+  const { user } = useAuth();
+  const inviteLimit = useInviteLimit(user?.id ?? null);
   const invite = messageText(lead, 'invite_message') ?? '';
   const inmailSubject = messageText(lead, 'linkedin_inmail_subject');
   const inmailMessage = messageText(lead, 'linkedin_inmail_message');
@@ -510,6 +513,7 @@ export function OutreachTab({
       ...REPLY_KEYS,
     ]),
     new Set([invite, inmailMessage ?? '', pipelineReply ?? ''].filter(Boolean)),
+    inviteLimit,
   );
 
   const hasAnyMessage = !!invite || !!inmailMessage || !!pipelineReply || extraMessages.length > 0;
@@ -524,7 +528,7 @@ export function OutreachTab({
       {!hasAnyMessage ? <NoMessages lead={lead} /> : null}
 
       {invite ? (
-        <MessageCard title="Connection invite" body={invite} limit={INVITE_CHAR_LIMIT} />
+        <MessageCard title="Connection invite" body={invite} limit={inviteLimit} />
       ) : null}
 
       {/* The same profiling write-up the Psychographics tab leads with — the

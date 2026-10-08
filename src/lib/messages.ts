@@ -1,4 +1,4 @@
-import { DRAFT_CHAT_WEBHOOK } from './constants';
+import { DRAFT_CHAT_WEBHOOK, DRAFT_INVITE_WEBHOOK } from './constants';
 import { supabase, supabaseConfigError, toFriendlyError, type FriendlyError } from './supabase';
 import type { SendStatus } from './types';
 
@@ -16,7 +16,7 @@ function notConfigured<T>(): Result<T> {
 
 async function updateLeads(
   ids: number[],
-  column: 'send_status' | 'chat_status',
+  column: 'send_status' | 'chat_status' | 'invite_status',
   from: string[],
   patch: Record<string, unknown>,
 ): Promise<Result<number>> {
@@ -63,11 +63,29 @@ export interface ChatRunResult {
   remaining: number;
 }
 
+/** Ask the AI to shorten (if too long) or rewrite these connection notes. */
+export function requestInviteNotes(ids: number[], userId: string) {
+  return updateLeads(ids, 'invite_status', ['none'], {
+    invite_status: 'draft_requested',
+    invite_owner: userId,
+    invite_error: null,
+  });
+}
+
 /** One call to the chat-message writer (it handles up to 8 leads per call). */
-export async function runChatBatch(userId: string): Promise<Result<ChatRunResult>> {
+export function runChatBatch(userId: string): Promise<Result<ChatRunResult>> {
+  return runWriterBatch(DRAFT_CHAT_WEBHOOK, 'message writer', userId);
+}
+
+/** One call to the connection-note writer (up to 8 leads per call). */
+export function runInviteBatch(userId: string): Promise<Result<ChatRunResult>> {
+  return runWriterBatch(DRAFT_INVITE_WEBHOOK, 'note writer', userId);
+}
+
+async function runWriterBatch(url: string, what: string, userId: string): Promise<Result<ChatRunResult>> {
   let response: Response;
   try {
-    response = await fetch(DRAFT_CHAT_WEBHOOK, {
+    response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId }),
@@ -76,7 +94,7 @@ export async function runChatBatch(userId: string): Promise<Result<ChatRunResult
     return {
       data: null,
       error: {
-        message: 'The message writer could not be reached.',
+        message: `The ${what} could not be reached.`,
         hint: `Check your connection and try again. Details: ${cause instanceof Error ? cause.message : String(cause)}`,
         code: 'DRAFT_CHAT',
       },
@@ -94,7 +112,7 @@ export async function runChatBatch(userId: string): Promise<Result<ChatRunResult
     return {
       data: null,
       error: {
-        message: `The message writer returned an error${response.ok ? '' : ` (${response.status})`}.`,
+        message: `The ${what} returned an error${response.ok ? '' : ` (${response.status})`}.`,
         hint: raw ? `Details: ${raw.slice(0, 300)}` : null,
         code: 'DRAFT_CHAT',
       },

@@ -43,6 +43,10 @@ export interface Lead {
   send_error?: string | null;
   send_queued_at?: string | null;
   send_sent_at?: string | null;
+  /** "Shorten / Rewrite with AI" for the connection note. */
+  invite_status?: 'none' | 'draft_requested' | 'drafting' | null;
+  invite_owner?: string | null;
+  invite_error?: string | null;
 }
 
 export type ChatStatus = 'none' | 'draft_requested' | 'drafting' | 'drafted';
