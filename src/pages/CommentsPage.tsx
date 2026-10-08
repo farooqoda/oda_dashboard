@@ -485,6 +485,21 @@ export function CommentsPage() {
 
   const pendingCount = useMemo(() => posts.filter((p) => statusOf(p) === 'pending').length, [posts]);
 
+  // Posts saved before the link fix: the extension can never open them.
+  const linkless = useMemo(
+    () => posts.filter((p) => !hasPostLink(p) && ['pending', 'drafted', 'failed'].includes(statusOf(p))),
+    [posts],
+  );
+  const [cleaning, setCleaning] = useState(false);
+  const dismissLinkless = async () => {
+    if (!linkless.length) return;
+    if (!window.confirm(`Move ${linkless.length} posts without a link to Skipped? You can still see them there.`)) return;
+    setCleaning(true);
+    const ids = linkless.map((p) => p.id);
+    await withBusy(ids, () => dismissPosts(ids));
+    setCleaning(false);
+  };
+
   const visible = useMemo(() => {
     const t = TABS.find((x) => x.key === tab)!;
     return t.statuses ? posts.filter((p) => t.statuses!.includes(statusOf(p))) : posts;
@@ -612,6 +627,19 @@ export function CommentsPage() {
           The AI is writing comments… {drafting.done} done
           {drafting.remaining ? `, ${drafting.remaining} to go` : ''}. You can keep reviewing meanwhile.
         </p>
+      ) : null}
+
+      {linkless.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>
+            {linkless.length} {linkless.length === 1 ? 'post has' : 'posts have'} no link, so the extension can't open{' '}
+            {linkless.length === 1 ? 'it' : 'them'} to comment. Scraping the same search again adds the link if the post shows up;
+            otherwise move them out of the way.
+          </span>
+          <button type="button" className="btn-secondary" disabled={cleaning} onClick={() => void dismissLinkless()}>
+            {cleaning ? 'Moving…' : `Move ${linkless.length} to Skipped`}
+          </button>
+        </div>
       ) : null}
 
       {queuedNotice ? (
