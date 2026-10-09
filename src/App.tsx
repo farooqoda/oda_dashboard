@@ -12,6 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OutreachPage } from './pages/OutreachPage';
 import { PromptsPage } from './pages/PromptsPage';
+import { BulkLeadsPage } from './pages/BulkLeadsPage';
 import { PostsPage } from './pages/PostsPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -67,6 +68,7 @@ function Shell() {
             <Route path="/posts" element={<PostsPage />} />
             <Route path="/comments" element={<CommentsPage />} />
             <Route path="/prompts" element={<PromptsPage />} />
+            <Route path="/bulk-leads" element={<BulkLeadsPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />

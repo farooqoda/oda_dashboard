@@ -29,6 +29,8 @@ export interface Lead {
   review_status: string | null;
   contact_id: string | null;
   profile_text: string | null;
+  /** Clean profile sections (Part 2 ver30+): LinkedIn-style view, PDF and Excel. */
+  profile_sections?: import('./profile').ProfileSections | null;
   created_at: string | null;
   updated_at: string | null;
   /** Longer AI message for leads you are already connected to (Message Sender). */

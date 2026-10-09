@@ -7,6 +7,7 @@ import { outreachQueue, repliedCount } from '../lib/selectors';
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/leads', label: 'Leads', end: false },
+  { to: '/bulk-leads', label: 'Bulk Leads', end: false },
   { to: '/outreach', label: 'Outreach', end: false },
   { to: '/posts', label: 'Posts', end: false },
   { to: '/comments', label: 'Comments', end: false },
