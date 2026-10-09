@@ -53,6 +53,13 @@ export function toAuthError(error: unknown): FriendlyError {
     code: base.code,
   });
 
+  // Sign-up blocked by the approved-emails list (gab_allowed_emails), or any other sign-up database error.
+  if (/not allowed to sign up|database error saving new user/i.test(raw)) {
+    return friendly(
+      'This email is not approved for access.',
+      'Sign up with the work email your administrator added, or ask them to give access to this email.',
+    );
+  }
   if (/invalid login credentials/i.test(raw)) {
     return friendly('That email and password combination was not recognised.');
   }
