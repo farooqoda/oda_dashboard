@@ -17,6 +17,7 @@ import { useLeads } from '../data/LeadsProvider';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { PAGE_SIZE } from '../lib/constants';
 import { downloadCsv, leadsToCsv } from '../lib/csv';
+import { downloadMasterCsv, downloadMasterXlsx } from '../lib/exportLeads';
 import { displayName, formatDate, formatDateCompact, stageOf } from '../lib/format';
 import {
   EMPTY_FILTERS,
@@ -159,9 +160,11 @@ export function LeadsPage() {
 
   const selectedRows = sorted.filter((l) => selected.has(l.id));
 
-  const exportRows = (rows: Lead[], suffix: string) => {
+  const exportRows = async (rows: Lead[], suffix: string, kind: DownloadKind) => {
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`leads-${suffix}-${stamp}.csv`, leadsToCsv(rows));
+    if (kind === 'xlsx') await downloadMasterXlsx(rows, `leads-${suffix}-${stamp}.xlsx`);
+    else if (kind === 'csv') downloadMasterCsv(rows, `leads-${suffix}-${stamp}.csv`);
+    else downloadCsv(`leads-${suffix}-dashboard-fields-${stamp}.csv`, leadsToCsv(rows));
   };
 
   if (error) {
@@ -232,14 +235,11 @@ export function LeadsPage() {
                 </div>
               ) : null}
             </div>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => exportRows(sorted, 'filtered')}
-              disabled={sorted.length === 0}
-            >
-              Export CSV
-            </button>
+            <DownloadMenu
+              label="Download"
+              count={sorted.length}
+              onPick={(kind) => exportRows(sorted, isFilterActive(filters) ? 'filtered' : 'all', kind)}
+            />
           </>
         }
       />
@@ -274,13 +274,11 @@ export function LeadsPage() {
           <span className="text-sm text-brand-900">
             {selectedRows.length.toLocaleString()} selected
           </span>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => exportRows(selectedRows, 'selected')}
-          >
-            Export selected
-          </button>
+          <DownloadMenu
+            label="Download selected"
+            count={selectedRows.length}
+            onPick={(kind) => exportRows(selectedRows, 'selected', kind)}
+          />
           <button type="button" className="btn-ghost" onClick={() => setSelected(new Set())}>
             Clear selection
           </button>
@@ -581,5 +579,72 @@ export function LeadsPage() {
 
       <LeadModal leadId={openId} onClose={() => setOpenId(null)} />
     </>
+  );
+}
+
+type DownloadKind = 'xlsx' | 'csv' | 'dashboard-csv';
+
+/** Excel or CSV with the Master Lead Pipeline columns, saved to this computer. */
+function DownloadMenu({
+  label,
+  count,
+  onPick,
+}: {
+  label: string;
+  count: number;
+  onPick: (kind: DownloadKind) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const pick = async (kind: DownloadKind) => {
+    setOpen(false);
+    setBusy(true);
+    setFailed(false);
+    try {
+      await onPick(kind);
+    } catch (err) {
+      console.error('Download failed', err);
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const options: { kind: DownloadKind; title: string; note: string }[] = [
+    { kind: 'xlsx', title: 'Excel (.xlsx)', note: 'Master Lead Pipeline columns' },
+    { kind: 'csv', title: 'CSV', note: 'Master Lead Pipeline columns' },
+    { kind: 'dashboard-csv', title: 'CSV (dashboard fields)', note: 'Fit score, type, stage, invite…' },
+  ];
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        disabled={count === 0 || busy}
+      >
+        {busy ? 'Preparing…' : `⬇ ${label}`}
+      </button>
+      {failed ? <span className="ml-2 text-xs text-critical">Download failed</span> : null}
+      {open ? (
+        <div className="absolute right-0 z-20 mt-1 w-64 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+          <p className="px-3 pb-1 pt-2 text-xs text-slate-500">
+            {count.toLocaleString()} lead{count === 1 ? '' : 's'}, saved to this computer
+          </p>
+          {options.map((o) => (
+            <button
+              key={o.kind}
+              type="button"
+              onClick={() => void pick(o.kind)}
+              className="block w-full rounded px-3 py-2 text-left hover:bg-slate-50"
+            >
+              <span className="block text-sm font-medium text-slate-800">{o.title}</span>
+              <span className="block text-xs text-slate-500">{o.note}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
