@@ -48,10 +48,12 @@ export function SignUpPage() {
             <span className="font-medium text-slate-900">{email.trim()}</span>. Open it, then sign
             in.
           </p>
-          <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            Your invite code has been saved and will be applied automatically the first time you
-            sign in, so you do not need to enter it again.
-          </p>
+          {inviteCode.trim() ? (
+            <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Your invite code has been saved and will be applied automatically the first time you
+              sign in, so you do not need to enter it again.
+            </p>
+          ) : null}
         </div>
       </AuthLayout>
     );
@@ -60,7 +62,7 @@ export function SignUpPage() {
   return (
     <AuthLayout
       title="Sign up"
-      description="An invite code is required. It decides which client's leads you can see."
+      description="Team members: sign up with your work email. Clients: use the invite code you were given."
       footer={
         <>
           Already have an account?{' '}
@@ -92,13 +94,12 @@ export function SignUpPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <Field
-          label="Invite code"
+          label="Invite code (if you were given one)"
           type="text"
           name="inviteCode"
-          required
           spellCheck={false}
           autoCapitalize="none"
-          hint="Matched exactly, including capitalisation."
+          hint="Leave empty if your work email was added by your administrator. Codes are matched exactly, including capitalisation."
           value={inviteCode}
           onChange={(e) => setInviteCode(e.target.value)}
         />

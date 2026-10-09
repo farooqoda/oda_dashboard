@@ -211,17 +211,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string, inviteCode: string) => {
       if (!supabase) return { error: CONFIG_ERROR, needsEmailConfirmation: false };
 
+      // The code is optional: team members whose work email is approved (gab_allowed_emails)
+      // sign up without one and are linked to their client by the database. The code is
+      // also sent along so the database can let invited clients in.
       const code = inviteCode.trim();
-      if (!code) {
-        return {
-          error: { message: 'Enter the invite code you were given.', hint: null, code: 'INVITE_MISSING' },
-          needsEmailConfirmation: false,
-        };
-      }
 
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
+        options: code ? { data: { invite_code: code } } : undefined,
       });
       if (error) return { error: toAuthError(error), needsEmailConfirmation: false };
 
@@ -241,8 +239,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // there is no JWT to write with yet. Park the code and redeem it on the
       // first real sign-in rather than failing the signup.
       if (!data.session) {
-        storePendingInvite(code);
+        if (code) storePendingInvite(code);
         return { error: null, needsEmailConfirmation: true };
+      }
+
+      // No code: an approved work email, already linked by the database.
+      if (!code) {
+        if (mounted.current) setLinkChecked(false);
+        return { error: null, needsEmailConfirmation: false };
       }
 
       const result = await redeemInvite(supabase, code, newUser.id);
