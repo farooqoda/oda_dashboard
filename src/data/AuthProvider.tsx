@@ -12,6 +12,7 @@ import {
 import {
   clearPendingInvite,
   fetchClientLink,
+  selfLinkApprovedEmail,
   redeemInvite,
   storePendingInvite,
   takePendingInvite,
@@ -183,6 +184,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Surface why the parked code failed instead of silently dropping it.
       setLinkError(result.error);
     }
+
+    // An approved work email (gab_allowed_emails) links itself without a code:
+    // covers people who signed up before their email was added to the list.
+    const self = await selfLinkApprovedEmail(supabase);
+    if (!mounted.current) return;
+    if (self.clientId) {
+      const again = await fetchClientLink(supabase, userId);
+      if (!mounted.current) return;
+      setClientId(again.clientId ?? self.clientId);
+      setClientName(again.clientName ?? null);
+      setSetupCompleted(true);
+      setLinkError(null);
+      setLinkChecked(true);
+      return;
+    }
+    if (self.error && !pending) setLinkError(self.error);
 
     setClientId(null);
     setLinkChecked(true);
