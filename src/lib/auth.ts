@@ -329,6 +329,22 @@ export async function fetchClientLink(
   };
 }
 
+/**
+ * Links the signed-in user to their client when their email is on the approved list
+ * (database function gab_link_me). Returns no client when the email is not approved, or
+ * when the function is not installed yet; any other failure is reported.
+ */
+export async function selfLinkApprovedEmail(
+  client: SupabaseClient,
+): Promise<{ clientId: string | null; error: FriendlyError | null }> {
+  const { data, error } = await client.rpc('gab_link_me');
+  if (error) {
+    const missing = error.code === 'PGRST202' || /could not find the function|does not exist/i.test(error.message);
+    return { clientId: null, error: missing ? null : toFriendlyError(error) };
+  }
+  return { clientId: typeof data === 'string' && data.trim() ? data : null, error: null };
+}
+
 // ---------------------------------------------------------------------------
 // Licence key
 // ---------------------------------------------------------------------------
