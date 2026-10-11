@@ -2,25 +2,25 @@ import { ENABLED_TASKS, useExtensionTask, type Task } from '../lib/extensionBrid
 
 const TASK_INFO: Record<Task, { title: string; description: string; nextStep: string }> = {
   post_scraper: {
-    title: 'Post Scraper',
-    description: 'Collect posts from a LinkedIn search or feed: name, profile, post link, headline and text.',
+    title: 'Discover Conversations',
+    description: 'Find posts and discussions connected to your goals. Collects posts from a LinkedIn search or feed.',
     nextStep:
-      'Open LinkedIn, search and apply the filters you want, let the posts load, then press "Scrape Posts". Results appear under Posts.',
+      'Open LinkedIn, search and apply the filters you want, let the posts load, then press "Scrape Posts". Results appear under Discover Conversations.',
   },
   comment_poster: {
-    title: 'Comment Poster',
-    description: 'Post the AI comments you approved on the Comments page, one at a time with safe pauses.',
-    nextStep: 'Approve comments on the Comments page, then open LinkedIn and press "Start" in the Comment Poster panel.',
+    title: 'Comment Assistant',
+    description: 'Prepare specific, useful comments for your review. The ones you approve are posted one at a time with safe pauses.',
+    nextStep: 'Approve comments on the Comment Assistant page, then open LinkedIn and press "Start" in the Comment Assistant panel.',
   },
   lead_scraper: {
-    title: 'Lead Scraper',
-    description: 'Sync a LinkedIn profile as a lead and get a personalized message. If you are already connected, it is typed into the chat for you — you press Send.',
-    nextStep: 'Open any LinkedIn profile and press "Sync Full Lead". Leads you don\'t message right away wait on the Outreach page.',
+    title: 'Find People',
+    description: 'Research potential partners, clients, and collaborators. Save a LinkedIn profile and get a personalized message; if you are already connected, it is typed into the chat for you — you press Send.',
+    nextStep: 'Open any LinkedIn profile and press "Sync Full Lead". People you don\'t message right away wait in Message Studio.',
   },
   message_sender: {
-    title: 'Message Sender',
-    description: 'Send your approved outreach to selected leads: connection requests with a note, or chat messages to people you are already connected with.',
-    nextStep: 'Select leads on the Outreach page and press Send, then open LinkedIn and press "Start" in the Message Sender panel.',
+    title: 'Message Studio',
+    description: 'Draft personalized outreach messages, then send the ones you approve: connection requests with a note, or chat messages to people you are already connected with.',
+    nextStep: 'Select people in Message Studio and press Send, then open LinkedIn and press "Start" in the Message Studio panel.',
   },
 };
 
@@ -44,7 +44,7 @@ const TASK_TONE: Record<Task, { bar: string; ring: string; badge: string; button
   },
 };
 
-const ORDER: Task[] = ['post_scraper', 'comment_poster', 'lead_scraper', 'message_sender'];
+const ORDER: Task[] = ['lead_scraper', 'post_scraper', 'comment_poster', 'message_sender'];
 
 export function TaskPicker() {
   const { status, task, pending, refused, chooseTask, recheck } = useExtensionTask();
@@ -72,8 +72,8 @@ export function TaskPicker() {
 
       {status === 'missing' ? (
         <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-          The GAB extension (v4.16 or newer) is not running in this browser. Install or enable it in
-          Tampermonkey, then reload this page. Tasks are saved in the extension, so pick them in the
+          The Impact Connect extension ("GAB LinkedIn Assistant" in Tampermonkey, v4.16 or newer) is not
+          running in this browser. Install or enable it in Tampermonkey, then reload this page. Tasks are saved in the extension, so pick them in the
           same browser you use for LinkedIn.
         </p>
       ) : null}

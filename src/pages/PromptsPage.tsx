@@ -19,7 +19,7 @@ import { CommentPromptPanel } from './CommentsPage';
 const EMPTY: PromptSetDraft = { name: '', profiling_instructions: '', invite_instructions: '', sender_name: '' };
 
 const PROFILING_HINT =
-  'Example: You review LinkedIn profiles for Ontario Digital Academy. Decide which of our programs fits this person, what they may need, and what relationship value they could offer. Separate facts from guesses.';
+  'Example: You review LinkedIn profiles for our organization. Decide which of our programs fits this person, what they may need, and what relationship value they could offer. Separate facts from guesses.';
 const INVITE_HINT =
   'Example: We are a registered Ontario not-for-profit helping small businesses and newcomers with AI and digital skills. Mention one specific thing from their profile. Warm, no selling, no links.';
 const CHAT_HINT =
@@ -167,7 +167,7 @@ function LeadPromptSets({ userId, clientId, inviteLimit }: { userId: string; cli
 
   return (
     <Card
-      title="Lead Scraper prompts"
+      title="Find People prompts"
       description="Used when the extension syncs a LinkedIn profile: the AI profiles the lead and writes the connection note. Keep as many prompt sets as you like and choose the one in use."
       className="mb-6"
     >
@@ -200,7 +200,7 @@ function LeadPromptSets({ userId, clientId, inviteLimit }: { userId: string; cli
           </button>
           {!sets.length ? (
             <p className="mt-3 text-xs leading-relaxed text-slate-600">
-              No prompt sets yet. Until you save one, the Lead Scraper uses your team's prompt set, or a built-in
+              No prompt sets yet. Until you save one, Find People uses your team's prompt set, or a built-in
               default if nobody has one. Copy your old Google Sheet prompt here to keep using it.
             </p>
           ) : !activeId ? (
@@ -339,7 +339,7 @@ function InviteLength({
   return (
     <Card
       title="Your LinkedIn account"
-      description="LinkedIn limits how long a connection note can be. New notes are written to fit, and the Outreach page checks every note against it."
+      description="LinkedIn limits how long a connection note can be. New notes are written to fit, and Message Studio checks every note against it."
       className="mb-6"
     >
       <fieldset className="grid gap-3 sm:grid-cols-2" disabled={busy}>
@@ -409,7 +409,7 @@ function ChatPrompt({ userId, clientId }: { userId: string; clientId: string | n
   return (
     <Card
       title="Chat message prompt"
-      description="For leads you are already connected to: the longer message the Message Sender sends in their chat."
+      description="For leads you are already connected to: the longer message Message Studio sends in their chat."
       className="mb-6"
     >
       <textarea

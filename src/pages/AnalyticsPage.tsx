@@ -106,7 +106,7 @@ export function AnalyticsPage() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <ChartCard
             title="Leads by bucket"
-            description="All ten ODA buckets, including empty ones."
+            description="All ten lead buckets, including empty ones."
             columns={['Bucket', 'Leads']}
             rows={buckets}
             refreshing={refreshing}

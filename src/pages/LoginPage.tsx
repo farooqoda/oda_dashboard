@@ -123,13 +123,13 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title="Sign in"
-      description="Use the email address your invite was sent to."
+      title="Welcome to Impact Connect"
+      description="Use this workspace to find relevant people, contribute thoughtfully to conversations, and manage relationship-building follow-ups. Sign in to continue."
       footer={
         <>
           Do not have an account yet?{' '}
           <Link to="/signup" className="font-medium text-brand-700 underline underline-offset-2">
-            Sign up with an invite code
+            Sign up
           </Link>
         </>
       }

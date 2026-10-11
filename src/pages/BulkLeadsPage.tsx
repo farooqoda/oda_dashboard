@@ -128,7 +128,7 @@ export function BulkLeadsPage() {
   const act = async (kind: 'queued' | 'new' | 'skipped' | 'delete') => {
     const target = kind === 'delete' ? selectedRows.filter((r) => r.status !== 'scraping') : can(kind);
     if (!target.length) return;
-    if (kind === 'delete' && !window.confirm(`Delete ${target.length} collected ${target.length === 1 ? 'person' : 'people'} from this list? Leads already synced stay on the Leads page.`)) return;
+    if (kind === 'delete' && !window.confirm(`Delete ${target.length} collected ${target.length === 1 ? 'person' : 'people'} from this list? People already synced stay on the Find People page.`)) return;
     setBusy(true);
     setActionError(null);
     const ids = target.map((r) => r.id);
@@ -141,7 +141,7 @@ export function BulkLeadsPage() {
     const n = res.data;
     setNotice(
       kind === 'queued'
-        ? `${n} picked. On LinkedIn (Lead Scraper task) press “▶️ Sync picked profiles” in the GAB panel.`
+        ? `${n} picked. On LinkedIn (Find People task) press “▶️ Sync picked profiles” in the extension panel.`
         : kind === 'new'
           ? `${n} moved back to Waiting.`
           : kind === 'skipped'
@@ -164,7 +164,7 @@ export function BulkLeadsPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Bulk Leads" />
+        <PageHeader title="People Search" />
         <ErrorState error={error} onRetry={() => void refresh()} />
       </>
     );
@@ -173,8 +173,8 @@ export function BulkLeadsPage() {
   return (
     <>
       <PageHeader
-        title="Bulk Leads"
-        description="People collected from your LinkedIn searches. Pick who to sync; the extension opens each profile and adds it to Leads with its profile, PDF and invite note."
+        title="People Search"
+        description="Research potential partners, clients, and collaborators in bulk: people collected from your LinkedIn searches. Pick who to sync; the extension opens each profile and adds it to Find People with its profile, PDF and invite note."
         actions={
           <button type="button" className="btn-secondary" onClick={() => void refresh()}>
             Refresh
@@ -185,11 +185,11 @@ export function BulkLeadsPage() {
       <section className="card mb-6 p-5">
         <ol className="grid gap-4 md:grid-cols-3">
           <Step n={1} title="Collect from a LinkedIn search">
-            On LinkedIn, search for people (filters like location, industry or connection degree work too). The GAB panel at the bottom
+            On LinkedIn, search for people (filters like location, industry or connection degree work too). The extension panel at the bottom
             right shows “📋 Collect people from this search” — choose how many pages.
           </Step>
           <Step n={2} title="Pick who to sync">
-            They land here under Waiting. Select the people you want and press “Sync selected”. People already on your Leads page are
+            They land here under Waiting. Select the people you want and press “Sync selected”. People already on your Find People page are
             marked.
           </Step>
           <Step n={3} title="Let the extension sync them">
@@ -222,12 +222,12 @@ export function BulkLeadsPage() {
             <span className="flex items-center gap-2 text-amber-900">
               Your extension is on another task.
               <button type="button" className="btn-secondary py-1 text-xs" onClick={() => extension.chooseTask('lead_scraper')}>
-                Switch to Lead Scraper
+                Switch to Find People
               </button>
             </span>
           ) : null}
           {extension.status === 'missing' ? (
-            <span className="text-amber-900">The GAB extension is not running in this browser.</span>
+            <span className="text-amber-900">The extension is not running in this browser.</span>
           ) : null}
         </div>
       </section>
@@ -319,7 +319,7 @@ export function BulkLeadsPage() {
         <SkeletonTable />
       ) : rows.length === 0 ? (
         <EmptyState title="Nobody collected yet">
-          Open LinkedIn with the Lead Scraper task, search for people, and press “📋 Collect people from this search” in the GAB panel.
+          Open LinkedIn with the Find People task, search for people, and press “📋 Collect people from this search” in the extension panel.
           They will appear here.
         </EmptyState>
       ) : visible.length === 0 ? (

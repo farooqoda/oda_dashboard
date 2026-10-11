@@ -129,7 +129,7 @@ export function DashboardPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Dashboard" />
+        <PageHeader title="Build meaningful professional relationships" />
         <TaskPicker />
         <ErrorState error={error} onRetry={refresh} />
       </>
@@ -152,8 +152,8 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Everything below is counted from the leads currently loaded for your account."
+        title="Build meaningful professional relationships"
+        description="Research relevant people, discover useful conversations, prepare thoughtful outreach, and keep follow-ups organized—all in one workspace."
         actions={
           <button type="button" className="btn-secondary" onClick={refresh} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh'}
@@ -167,7 +167,7 @@ export function DashboardPage() {
         <SkeletonStatCards />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Total leads" value={stats.total} sub={totalSub} loading={false} />
+          <StatCard label="People found" value={stats.total} sub={totalSub} loading={false} />
           <StatCard
             label="Profiled"
             value={stats.profiled}
@@ -196,7 +196,8 @@ export function DashboardPage() {
       <div className="mt-8">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Pipeline</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Follow-up Tracker</h2>
+            <span className="text-xs text-slate-500">Keep track of conversations and next steps ·</span>
             <span className="text-xs text-slate-500">
               {stages.length} {pluralise(stages.length, 'stage')}
             </span>

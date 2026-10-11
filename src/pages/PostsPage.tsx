@@ -91,7 +91,7 @@ export function PostsPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Posts" />
+        <PageHeader title="Discover Conversations" />
         <ErrorState error={error} onRetry={() => void load()} />
       </>
     );
@@ -100,8 +100,8 @@ export function PostsPage() {
   return (
     <>
       <PageHeader
-        title="Posts"
-        description="Posts collected by the Post Scraper. Choose Post Scraper on the Dashboard, then press Scrape Posts on LinkedIn. This page updates every few seconds while it is open."
+        title="Discover Conversations"
+        description="Find posts and discussions connected to your goals. Choose Discover Conversations on the Dashboard, then press Scrape Posts on LinkedIn. This page updates every few seconds while it is open."
         actions={
           <>
             <input
@@ -135,7 +135,7 @@ export function PostsPage() {
         <SkeletonTable rows={6} />
       ) : posts.length === 0 ? (
         <EmptyState title="No posts scraped yet">
-          Pick Post Scraper on the Dashboard, open a LinkedIn search, load the posts you want and press
+          Pick Discover Conversations on the Dashboard, open a LinkedIn search, load the posts you want and press
           Scrape Posts. They appear here as they are saved.
         </EmptyState>
       ) : filtered.length === 0 ? (
