@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout, Field, FormError } from '../components/AuthLayout';
 import { updatePassword, validateNewPassword } from '../lib/auth';
-import { supabase, supabaseConfigError, type FriendlyError } from '../lib/supabase';
+import { readAuthLink } from '../lib/authLink';
+import { supabase, supabaseConfigError, toFriendlyError, type FriendlyError } from '../lib/supabase';
 
 /**
  * Where the emailed reset link lands (RESET_PASSWORD_REDIRECT_URL in
@@ -30,8 +31,13 @@ export function ResetPasswordPage() {
   const navigate = useNavigate();
   const mounted = useRef(true);
 
-  const [checking, setChecking] = useState(true);
+  // A scanner-proof link (?token_hash=…) is only used when the person presses
+  // "Continue", so an email scanner opening the link first cannot spend it.
+  const [tokenHash] = useState(() => readAuthLink().tokenHash);
+  const [verifying, setVerifying] = useState(false);
+  const [checking, setChecking] = useState(!tokenHash);
   const [hasRecoverySession, setHasRecoverySession] = useState(false);
+  const [linkFailed, setLinkFailed] = useState<FriendlyError | null>(null);
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -51,6 +57,7 @@ export function ResetPasswordPage() {
       setChecking(false);
       return;
     }
+    if (tokenHash) return; // waits for the Continue button instead
     const client = supabase;
 
     void client.auth.getSession().then(({ data }) => {
@@ -68,7 +75,22 @@ export function ResetPasswordPage() {
     });
 
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [tokenHash]);
+
+  const onContinue = async () => {
+    if (!supabase || !tokenHash) return;
+    setVerifying(true);
+    const { error: err } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+    if (!mounted.current) return;
+    setVerifying(false);
+    if (err) {
+      setLinkFailed(toFriendlyError(err));
+      return;
+    }
+    // Drop the used token from the address bar so a reload cannot retry it.
+    window.history.replaceState(null, '', window.location.pathname);
+    setHasRecoverySession(true);
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -104,6 +126,16 @@ export function ResetPasswordPage() {
             Continue to the dashboard
           </button>
         </div>
+      </AuthLayout>
+    );
+  }
+
+  if (tokenHash && !hasRecoverySession && !linkFailed) {
+    return (
+      <AuthLayout title="Reset your password" description="Press Continue to choose a new password.">
+        <button type="button" className="btn-primary w-full" onClick={() => void onContinue()} disabled={verifying}>
+          {verifying ? 'Checking your link…' : 'Continue'}
+        </button>
       </AuthLayout>
     );
   }

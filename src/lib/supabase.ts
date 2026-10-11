@@ -14,6 +14,17 @@ export const supabaseConfigError: string | null =
 
 export const supabaseUrl = url ?? null;
 
+/**
+ * The address exactly as the page was opened, captured before Supabase reads
+ * (and clears) a sign-in token from it. Emailed links (password reset, sign-up
+ * confirmation) put their token or their error there, and the app needs to see
+ * it even after Supabase has tidied the address bar.
+ */
+export const initialAuthUrl =
+  typeof window !== 'undefined'
+    ? { hash: window.location.hash, search: window.location.search, path: window.location.pathname }
+    : { hash: '', search: '', path: '/' };
+
 export const supabase: SupabaseClient | null = supabaseConfigError
   ? null
   : createClient(url as string, anonKey as string, {
