@@ -10,17 +10,32 @@
   body {
     @apply bg-canvas text-slate-900 antialiased;
     font-family: theme('fontFamily.sans');
+    /* The design's warm canvas with a soft yellow glow, top right and bottom. */
+    background:
+      radial-gradient(900px 520px at 100% 0%, #fbeaa9 0%, rgba(251, 234, 169, 0) 60%),
+      radial-gradient(700px 500px at 80% 100%, #fbf1c9 0%, rgba(251, 241, 201, 0) 70%),
+      #efefee;
+    background-attachment: fixed;
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-sun-500 ring-offset-2 ring-offset-white;
   }
 }
 
 @layer components {
-  /* One card treatment everywhere: white, hairline border, no drop shadow. */
+  /* One card treatment everywhere: soft white, large radius, hairline border. */
   .card {
-    @apply rounded-card border border-line bg-white;
+    @apply rounded-card border border-white/70 bg-white/80 backdrop-blur-sm;
+  }
+
+  /* Dashboard widgets: the design's bigger, airier tiles. */
+  .tile {
+    @apply rounded-tile bg-white/65 p-6 backdrop-blur-sm;
+  }
+
+  .tile-dark {
+    @apply rounded-tile bg-ink p-6 text-white;
   }
 
   .pill {
@@ -28,11 +43,11 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply btn border-brand-600 bg-brand-600 text-white hover:bg-brand-700 hover:border-brand-700;
+    @apply btn border-ink bg-ink text-white hover:border-slate-700 hover:bg-slate-700;
   }
 
   .btn-secondary {
@@ -44,11 +59,11 @@
   }
 
   .input {
-    @apply w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500;
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-900;
   }
 
   .brand-title {
-    @apply font-display font-extrabold leading-none tracking-tight text-sun-500;
+    @apply font-display font-medium leading-none tracking-tight text-ink;
   }
 
   .label {
@@ -62,7 +77,7 @@
 
 /* Links under the sign-in card sit on navy. */
 .auth-footer a {
-  @apply font-medium text-sun-300 hover:text-sun-400;
+  @apply font-semibold text-ink underline underline-offset-2 hover:text-slate-700;
 }
 
 /* Search inputs get one custom clear control, not the native one on top of it. */
@@ -73,11 +88,17 @@ input[type='search']::-webkit-search-cancel-button {
 
 /* Range inputs: one accent colour, no browser default blue. */
 input[type='range'] {
-  accent-color: #2a78d6;
+  accent-color: #1d1d1f;
 }
 
 /* Charts hold their previous render at reduced opacity while refetching,
    rather than flashing a skeleton. */
 .is-refreshing {
   @apply opacity-60 transition-opacity;
+}
+
+/* "Messages to send" bar in the design: diagonal hatching. */
+.hatched {
+  background: repeating-linear-gradient(135deg, #ffffff 0 6px, #e3e1db 6px 8px);
+  border: 1px solid #e3e1db;
 }

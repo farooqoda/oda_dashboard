@@ -4,45 +4,53 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Brand name and page titles only; data stays in the system face.
-        display: ['"Bricolage Grotesque Variable"', 'system-ui', 'sans-serif'],
-        sans: [
-          'system-ui',
-          '-apple-system',
-          'Segoe UI',
-          'Roboto',
-          'Helvetica Neue',
-          'Arial',
-          'sans-serif',
-        ],
+        // Impact Connect: one face (Urbanist) for headings and data alike.
+        display: ['"Urbanist Variable"', 'Urbanist', 'system-ui', 'sans-serif'],
+        sans: ['"Urbanist Variable"', 'Urbanist', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
       },
       colors: {
-        // Single accent: deep blue. Chart marks use brand.500 (#2a78d6),
-        // which passes the data-viz palette checks against a white surface.
-        brand: {
-          50: '#eff5fd',
-          100: '#cde2fb',
-          200: '#9ec5f4',
-          300: '#6da7ec',
-          400: '#3987e5',
-          500: '#2a78d6',
-          600: '#256abf',
-          700: '#1c5cab',
-          800: '#184f95',
-          900: '#0d366b',
+        // Warm neutrals from the Impact Connect design. Overrides Tailwind's
+        // cool slate so every existing page picks the new tone up unchanged.
+        slate: {
+          50: '#f7f6f3',
+          100: '#f0efeb',
+          200: '#e3e1db',
+          300: '#d7d5cf',
+          400: '#a9a8ac',
+          500: '#77767a',
+          600: '#55545a',
+          700: '#3a3a3d',
+          800: '#232325',
+          900: '#1d1d1f',
         },
-        // Frame: deep navy sidebar, maple-gold brand mark, sky-tinted canvas.
-        ink: { DEFAULT: '#0E2747', 800: '#16365E', 700: '#21477A', 300: '#9FB6D6', 200: '#C9D7EA' },
-        sun: { 300: '#FAC96B', 400: '#F7B43A', 500: '#F5A524' },
-        canvas: '#EEF4FB',
-        line: '#D6E3F3',
+        // UI accent: near-black for actions and links, soft yellow for
+        // highlights (light tints) — the design's black-and-yellow pairing.
+        brand: {
+          50: '#fdf7dc',
+          100: '#faedb8',
+          200: '#f5df8a',
+          300: '#f0cf55',
+          400: '#55545a',
+          500: '#2c2c2f',
+          600: '#1d1d1f',
+          700: '#1d1d1f',
+          800: '#1d1d1f',
+          900: '#111112',
+        },
+        // Find People task colour — kept as-is so the extension panel still matches.
+        lead: { 50: '#eff5fd', 500: '#2a78d6', 600: '#256abf', 700: '#1c5cab', 800: '#184f95' },
+        ink: { DEFAULT: '#1d1d1f', 800: '#232325', 700: '#3a3a3d', 300: '#9c9ba0', 200: '#cfcdc8' },
+        sun: { 50: '#fdf7dc', 100: '#fbeaa9', 300: '#f8e08a', 400: '#f5d24f', 500: '#f0c419' },
+        canvas: '#efefee',
+        line: '#e3e1db',
         // Semantic colours. Fixed status palette — never reused for series identity.
         good: '#0ca30c',
         warning: '#fab219',
         critical: '#d03b3b',
       },
       borderRadius: {
-        card: '10px',
+        card: '22px',
+        tile: '28px',
       },
     },
   },

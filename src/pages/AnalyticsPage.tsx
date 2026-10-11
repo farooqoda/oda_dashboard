@@ -85,7 +85,7 @@ export function AnalyticsPage() {
     <>
       <PageHeader
         title="Analytics"
-        description="Only what the data can actually answer. Reply rates, meetings booked and send timings are not charted here because nothing in gab_leads or gab_activity records them."
+        description="Where your people come from and how they score. Reply rate, messages sent and follow-ups are on the Dashboard."
         actions={
           <button type="button" className="btn-secondary" onClick={refresh} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh'}

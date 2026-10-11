@@ -1,6 +1,6 @@
 import { ENABLED_TASKS, useExtensionTask, type Task } from '../lib/extensionBridge';
 
-const TASK_INFO: Record<Task, { title: string; description: string; nextStep: string }> = {
+export const TASK_INFO: Record<Task, { title: string; description: string; nextStep: string }> = {
   post_scraper: {
     title: 'Discover Conversations',
     description: 'Find posts and discussions connected to your goals. Collects posts from a LinkedIn search or feed.',
@@ -25,7 +25,7 @@ const TASK_INFO: Record<Task, { title: string; description: string; nextStep: st
 };
 
 // Each task keeps one colour everywhere on its card, so the four are told apart at a glance.
-const TASK_TONE: Record<Task, { bar: string; ring: string; badge: string; button: string; note: string }> = {
+export const TASK_TONE: Record<Task, { bar: string; ring: string; badge: string; button: string; note: string }> = {
   post_scraper: {
     bar: 'border-t-teal-500', ring: 'border-teal-500 ring-1 ring-teal-500', badge: 'bg-teal-50 text-teal-800',
     button: 'border-teal-600 bg-teal-600 text-white hover:bg-teal-700', note: 'bg-teal-50 text-teal-900',
@@ -35,8 +35,8 @@ const TASK_TONE: Record<Task, { bar: string; ring: string; badge: string; button
     button: 'border-violet-600 bg-violet-600 text-white hover:bg-violet-700', note: 'bg-violet-50 text-violet-900',
   },
   lead_scraper: {
-    bar: 'border-t-brand-500', ring: 'border-brand-500 ring-1 ring-brand-500', badge: 'bg-brand-50 text-brand-800',
-    button: 'border-brand-600 bg-brand-600 text-white hover:bg-brand-700', note: 'bg-brand-50 text-brand-900',
+    bar: 'border-t-lead-500', ring: 'border-lead-500 ring-1 ring-lead-500', badge: 'bg-lead-50 text-lead-800',
+    button: 'border-lead-600 bg-lead-600 text-white hover:bg-lead-700', note: 'bg-lead-50 text-lead-800',
   },
   message_sender: {
     bar: 'border-t-orange-500', ring: 'border-orange-500 ring-1 ring-orange-500', badge: 'bg-orange-50 text-orange-800',

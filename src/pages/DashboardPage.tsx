@@ -1,12 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LeadModal } from '../components/modal/LeadModal';
-import { TaskPicker } from '../components/TaskPicker';
+import {
+  FollowUpTracker,
+  HeadlineBars,
+  ModulesCard,
+  NetworkCard,
+  OutreachCard,
+  QueueCard,
+  ReplyRateCard,
+  SuggestedCard,
+} from '../components/home/HomeWidgets';
+import { useAuth } from '../data/AuthProvider';
+import { followUps, messageQueue, networkNodes, replyFunnel, sentThisWeek, suggestedConnection } from '../lib/home';
+import { loadCommentPosts } from '../lib/comments';
+import { firstNameOf, greeting } from '../lib/person';
+import { outreachQueue, repliedCount } from '../lib/selectors';
+import type { CommentPost } from '../lib/types';
 import {
   Avatar,
   EmptyState,
   ErrorState,
   SkeletonBoard,
-  SkeletonStatCards,
   StagePill,
   TypePill,
   PageHeader,
@@ -16,31 +30,6 @@ import { displayName, formatDate, pluralise, stageOf, stagePillClass } from '../
 import { dashboardStats, stageCounts } from '../lib/selectors';
 import { personalityType } from '../lib/traitsRegistry';
 import type { Lead } from '../lib/types';
-
-function StatCard({
-  label,
-  value,
-  sub,
-  loading,
-}: {
-  label: string;
-  value: number;
-  sub?: string | null;
-  loading: boolean;
-}) {
-  return (
-    <div className="card p-5">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      {loading ? (
-        <div className="skeleton mt-3 h-8 w-16" />
-      ) : (
-        <p className="mt-2 text-3xl font-semibold text-slate-900">{value.toLocaleString()}</p>
-      )}
-      {/* Sub-lines are only rendered when they are computed from real rows. */}
-      {!loading && sub ? <p className="mt-2 text-xs text-slate-500">{sub}</p> : null}
-    </div>
-  );
-}
 
 function LeadCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
   const type = personalityType(lead.traits);
@@ -78,7 +67,28 @@ export function DashboardPage() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
+  const { user } = useAuth();
   const stats = useMemo(() => dashboardStats(leads), [leads]);
+  const toSend = useMemo(() => outreachQueue(leads).length, [leads]);
+  const replied = useMemo(() => repliedCount(leads), [leads]);
+  const suggested = useMemo(() => suggestedConnection(leads), [leads]);
+  const network = useMemo(() => networkNodes(leads), [leads]);
+  const week = useMemo(() => sentThisWeek(leads), [leads]);
+  const funnel = useMemo(() => replyFunnel(leads), [leads]);
+  const queue = useMemo(() => messageQueue(leads), [leads]);
+
+  // Comment drafts for the follow-up tracker. Read-only; a failure just leaves them out.
+  const [posts, setPosts] = useState<CommentPost[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void loadCommentPosts().then(({ data }) => {
+      if (!cancelled && data) setPosts(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshing]);
+  const tracker = useMemo(() => followUps(leads, posts), [leads, posts]);
   const stages = useMemo(() => stageCounts(leads), [leads]);
 
   const byStage = useMemo(() => {
@@ -130,74 +140,72 @@ export function DashboardPage() {
     return (
       <>
         <PageHeader title="Build meaningful professional relationships" />
-        <TaskPicker />
         <ErrorState error={error} onRetry={refresh} />
       </>
     );
   }
 
-  const pct = (n: number) =>
-    stats.total > 0 ? `${Math.round((n / stats.total) * 100)}% of all leads` : null;
-
-  const totalSub = (() => {
-    if (stats.total === 0) return null;
-    const parts = [`${stats.createdLast7.toLocaleString()} added in the last 7 days`];
-    if (stats.weekOverWeekDelta !== null) {
-      const d = Math.round(stats.weekOverWeekDelta);
-      parts.push(`${d >= 0 ? '+' : ''}${d}% vs the 7 days before`);
-    }
-    return parts.join(' · ');
-  })();
+  const name = firstNameOf(user);
+  const hello = `${greeting()}${name ? `, ${name}` : ''}`;
 
   return (
     <>
-      <PageHeader
-        title="Build meaningful professional relationships"
-        description="Research relevant people, discover useful conversations, prepare thoughtful outreach, and keep follow-ups organized—all in one workspace."
-        actions={
-          <button type="button" className="btn-secondary" onClick={refresh} disabled={refreshing}>
+      {/* Hero: greeting, tagline, headline bars and the three big numbers. */}
+      <section className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+        <div className="min-w-0">
+          <p className="text-sm text-slate-600">{hello}</p>
+          <h1 className="mt-2 text-[2.4rem] font-normal leading-[1.05] tracking-[-0.035em] text-ink sm:text-[3.4rem]">
+            Find the right people.
+            <br />
+            Build genuine professional relationships.
+          </h1>
+          <div className="mt-6 max-w-3xl">
+            {loading ? (
+              <div className="skeleton h-10 w-full rounded-full" />
+            ) : (
+              <HeadlineBars found={stats.total} highFit={stats.highFit} toSend={toSend} replied={replied} />
+            )}
+          </div>
+        </div>
+        <div className="flex items-end gap-8 xl:pb-1">
+          {[
+            { v: stats.total, l: 'People found' },
+            { v: stats.highFit, l: 'High fit (70+)' },
+            { v: stats.createdLast7, l: 'Added this week' },
+          ].map((n) => (
+            <div key={n.l}>
+              <p className="text-5xl font-light tabular-nums tracking-[-0.04em] text-ink sm:text-[4rem] sm:leading-none">
+                {loading ? '–' : n.v.toLocaleString()}
+              </p>
+              <p className="mt-2 text-xs text-slate-600">{n.l}</p>
+            </div>
+          ))}
+          <button type="button" className="btn-secondary mb-1 hidden sm:inline-flex" onClick={refresh} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
-        }
-      />
-
-      <TaskPicker />
-
-      {loading ? (
-        <SkeletonStatCards />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="People found" value={stats.total} sub={totalSub} loading={false} />
-          <StatCard
-            label="Profiled"
-            value={stats.profiled}
-            sub={pct(stats.profiled)}
-            loading={false}
-          />
-          <StatCard
-            label="High fit (70+)"
-            value={stats.highFit}
-            sub={
-              stats.profiled > 0
-                ? `${Math.round((stats.highFit / stats.profiled) * 100)}% of profiled leads`
-                : null
-            }
-            loading={false}
-          />
-          <StatCard
-            label="Needs review"
-            value={stats.needsReview}
-            sub={pct(stats.needsReview)}
-            loading={false}
-          />
         </div>
-      )}
+      </section>
 
-      <div className="mt-8">
+      {/* Widgets, laid out like the design: three columns plus the dark queue. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SuggestedCard lead={suggested} onOpen={setOpenId} />
+        <NetworkCard nodes={network.nodes} activeThisWeek={network.activeThisWeek} onOpen={setOpenId} />
+        <OutreachCard days={week.days} total={week.total} />
+        <div className="flex flex-col gap-4 md:row-span-2">
+          <ReplyRateCard {...funnel} />
+          <QueueCard rows={queue.rows} done={queue.done} total={queue.total} onOpen={setOpenId} />
+        </div>
+        <ModulesCard />
+        <div className="md:col-span-2 xl:col-span-2">
+          <FollowUpTracker items={tracker} onOpen={setOpenId} />
+        </div>
+      </div>
+
+      <div className="mt-10">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Follow-up Tracker</h2>
-            <span className="text-xs text-slate-500">Keep track of conversations and next steps ·</span>
+            <h2 className="text-xl font-normal tracking-tight text-ink">Pipeline</h2>
+            <span className="text-xs text-slate-500">Everyone you found, by stage ·</span>
             <span className="text-xs text-slate-500">
               {stages.length} {pluralise(stages.length, 'stage')}
             </span>
