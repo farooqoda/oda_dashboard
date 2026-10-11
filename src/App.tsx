@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { readAuthLink } from './lib/authLink';
 import { RequireAuth } from './components/RequireAuth';
-import { Sidebar } from './components/Sidebar';
+import { TopBar } from './components/TopBar';
 import { AuthProvider } from './data/AuthProvider';
 import { LeadsProvider } from './data/LeadsProvider';
 import { AnalyticsPage } from './pages/AnalyticsPage';
@@ -20,48 +20,11 @@ import { SettingsPage } from './pages/SettingsPage';
 import { SignUpPage } from './pages/SignUpPage';
 
 function Shell() {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const location = useLocation();
-
-  useEffect(() => {
-    setMobileNavOpen(false);
-  }, [location.pathname]);
-
   return (
-    <div className="min-h-screen bg-canvas">
-      {/* Fixed sidebar from md up. */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 md:block">
-        <Sidebar />
-      </aside>
-
-      {/* Mobile drawer. */}
-      {mobileNavOpen ? (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div
-            className="absolute inset-0 bg-ink/50"
-            onClick={() => setMobileNavOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="relative h-full w-64">
-            <Sidebar onNavigate={() => setMobileNavOpen(false)} />
-          </div>
-        </div>
-      ) : null}
-
-      <div className="md:pl-60">
-        <header className="sticky top-0 z-20 flex items-center gap-3 bg-ink px-4 py-3 md:hidden">
-          <button
-            type="button"
-            className="btn border-white/25 bg-white/10 text-white hover:bg-white/20"
-            onClick={() => setMobileNavOpen(true)}
-            aria-label="Open navigation"
-          >
-            Menu
-          </button>
-          <span className="brand-title text-xl">Impact Connect</span>
-        </header>
-
-        <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen">
+      <TopBar />
+      <div>
+        <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-6 lg:px-8">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/leads" element={<LeadsPage />} />

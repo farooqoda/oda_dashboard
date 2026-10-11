@@ -14,23 +14,27 @@ export function AuthLayout({
   footer?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-7 text-center">
-          <p className="brand-title text-4xl">Impact Connect</p>
-          <p className="mt-2 text-sm text-ink-300">An Impact Innovation Hub product</p>
-          <p className="mt-3 text-xs text-ink-200">
-            Find the right people. Build genuine professional relationships.
+          <p className="inline-block rounded-full border border-slate-400/70 px-6 py-2 text-2xl font-medium tracking-tight text-ink">
+            Impact Connect
+          </p>
+          <p className="mt-3 text-sm text-slate-600">An Impact Innovation Hub product</p>
+          <p className="mt-4 text-[1.35rem] font-normal leading-snug tracking-[-0.02em] text-ink">
+            Find the right people.
+            <br />
+            Build genuine professional relationships.
           </p>
         </div>
 
-        <div className="card p-6">
-          <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+        <div className="card p-7">
+          <h1 className="text-xl font-medium text-slate-900">{title}</h1>
           {description ? <p className="mt-1 text-sm text-slate-600">{description}</p> : null}
           <div className="mt-5">{children}</div>
         </div>
 
-        {footer ? <div className="auth-footer mt-4 text-center text-sm text-ink-200">{footer}</div> : null}
+        {footer ? <div className="auth-footer mt-4 text-center text-sm text-slate-600">{footer}</div> : null}
       </div>
     </div>
   );
