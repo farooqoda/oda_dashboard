@@ -115,7 +115,7 @@ export const SUPPORT_EMAIL = 'support@ontariodigitalacademy.org';
  * value that happened to work from wherever it was last tested but was never
  * added to the allow-list would fail silently everywhere else.
  */
-export const RESET_PASSWORD_REDIRECT_URL = 'https://gab.fisolutionz.com/reset-password';
+export const RESET_PASSWORD_REDIRECT_URL = 'https://connect.impactinnovationhub.com/reset-password';
 
 /** Both password-reset paths — the emailed link and Settings — enforce this. */
 export const MIN_PASSWORD_LENGTH = 8;

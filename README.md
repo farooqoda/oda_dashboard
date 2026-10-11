@@ -46,7 +46,7 @@ npm run preview     # serve the built output
 
 Built by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) and published with GitHub
 Pages' `actions/deploy-pages`, from `dist/` — never from a checked-in `gh-pages` branch. It
-currently serves from a custom domain at its root (`gab.fisolutionz.com`), which is why the
+currently serves from a custom domain at its root (`connect.impactinnovationhub.com`), which is why the
 three places below all agree on `/`:
 
 * `base` in [`vite.config.ts`](vite.config.ts) — what Vite prefixes onto every built asset URL.
