@@ -6,11 +6,11 @@ import { outreachQueue, repliedCount } from '../lib/selectors';
 
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
-  { to: '/leads', label: 'Leads', end: false },
-  { to: '/bulk-leads', label: 'Bulk Leads', end: false },
-  { to: '/outreach', label: 'Outreach', end: false },
-  { to: '/posts', label: 'Posts', end: false },
-  { to: '/comments', label: 'Comments', end: false },
+  { to: '/leads', label: 'Find People', end: false },
+  { to: '/bulk-leads', label: 'People Search', end: false },
+  { to: '/outreach', label: 'Message Studio', end: false },
+  { to: '/posts', label: 'Discover Conversations', end: false },
+  { to: '/comments', label: 'Comment Assistant', end: false },
   { to: '/prompts', label: 'Prompts', end: false },
   { to: '/analytics', label: 'Analytics', end: false },
   { to: '/settings', label: 'Settings', end: false },
@@ -48,11 +48,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col bg-ink text-ink-200">
       <div className="px-5 pb-5 pt-6">
         <p className="brand-title text-[1.85rem]">
-          LinkedIn
+          Impact
           <br />
-          Outreach
+          Connect
         </p>
-        <p className="mt-2 text-xs font-medium text-ink-300">Ontario Digital Academy</p>
+        <p className="mt-2 text-xs font-medium text-ink-300">An Impact Innovation Hub product</p>
       </div>
 
       <nav className="flex-1 space-y-0.5 border-t border-white/10 px-3 py-4">
@@ -76,8 +76,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="space-y-2 border-t border-white/10 px-5 py-4">
-        <Count label="Total leads" value={leads.length} loading={loading} />
-        <Count label="Pending outreach" value={pending} loading={loading} />
+        <Count label="People found" value={leads.length} loading={loading} />
+        <Count label="Messages to send" value={pending} loading={loading} />
         <Count label="Replied or further" value={replied} loading={loading} />
       </div>
 

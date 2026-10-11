@@ -97,7 +97,7 @@ export function FilterPanel({
           ))}
         </div>
         <p className="mt-2 text-[11px] leading-snug text-slate-500">
-          All ten ODA buckets are always listed. Greyed rows are values found in the data that are
+          All ten lead buckets are always listed. Greyed rows are values found in the data that are
           not one of the ten.
         </p>
       </section>

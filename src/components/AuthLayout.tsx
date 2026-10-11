@@ -17,8 +17,11 @@ export function AuthLayout({
     <div className="flex min-h-screen items-center justify-center bg-ink px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-7 text-center">
-          <p className="brand-title text-4xl">LinkedIn Outreach</p>
-          <p className="mt-2 text-sm text-ink-300">Ontario Digital Academy</p>
+          <p className="brand-title text-4xl">Impact Connect</p>
+          <p className="mt-2 text-sm text-ink-300">An Impact Innovation Hub product</p>
+          <p className="mt-3 text-xs text-ink-200">
+            Find the right people. Build genuine professional relationships.
+          </p>
         </div>
 
         <div className="card p-6">

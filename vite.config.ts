@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  // Served from the domain root (gab.fisolutionz.com), not a GitHub Pages
+  // Served from the domain root (connect.impactinnovationhub.com), not a GitHub Pages
   // project subpath — '/' is also Vite's default, kept explicit here since
   // this value has to match <BrowserRouter basename> in src/main.tsx (which
   // reads it back via import.meta.env.BASE_URL) and the redirect target

@@ -588,7 +588,7 @@ export function CommentsPage() {
   if (!userId) {
     return (
       <>
-        <PageHeader title="Comments" />
+        <PageHeader title="Comment Assistant" />
         <EmptyState title="Not signed in">Sign in again to write comments.</EmptyState>
       </>
     );
@@ -597,7 +597,7 @@ export function CommentsPage() {
   if (loadError) {
     return (
       <>
-        <PageHeader title="Comments" />
+        <PageHeader title="Comment Assistant" />
         <ErrorState error={loadError} onRetry={() => void load()} />
       </>
     );
@@ -606,8 +606,8 @@ export function CommentsPage() {
   return (
     <>
       <PageHeader
-        title="Comments"
-        description="The AI writes a comment for each scraped post using your prompt. Review and edit them, then post the ones you like — the GAB extension posts them on LinkedIn, one at a time."
+        title="Comment Assistant"
+        description="Prepare specific, useful comments for your review. The AI drafts a comment for each discovered post using your prompt; edit them, then post the ones you like — the extension posts them on LinkedIn, one at a time."
         actions={
           <button
             type="button"
@@ -647,8 +647,8 @@ export function CommentsPage() {
           <span>
             {queuedNotice} {queuedNotice === 1 ? 'comment is' : 'comments are'} queued.{' '}
             {extension.status === 'connected'
-              ? 'Your extension is now set to Comment Poster. Open LinkedIn and press Start in the Comment Poster panel.'
-              : 'Open LinkedIn with the GAB extension and choose Comment Poster on the Dashboard.'}
+              ? 'Your extension is now set to Comment Assistant. Open LinkedIn and press Start in the Comment Assistant panel.'
+              : 'Open LinkedIn with the extension and choose Comment Assistant on the Dashboard.'}
           </span>
           <span className="flex items-center gap-2">
             <a href="https://www.linkedin.com/feed/" target="_blank" rel="noreferrer" className="btn-secondary">
@@ -715,7 +715,7 @@ export function CommentsPage() {
         <SkeletonCards count={3} />
       ) : posts.length === 0 ? (
         <EmptyState title="No posts yet">
-          Scrape some posts first (Dashboard → Post Scraper). They show up here, ready for comments.
+          Discover some posts first (Dashboard → Discover Conversations). They show up here, ready for comments.
         </EmptyState>
       ) : visible.length === 0 ? (
         <EmptyState title="Nothing here">

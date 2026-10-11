@@ -170,7 +170,7 @@ export function LeadsPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Leads" />
+        <PageHeader title="Find People" />
         <ErrorState error={error} onRetry={refresh} />
       </>
     );
@@ -179,7 +179,7 @@ export function LeadsPage() {
   return (
     <>
       <PageHeader
-        title="Leads"
+        title="Find People"
         description={
           loading
             ? 'Loading rows from gab_leads…'

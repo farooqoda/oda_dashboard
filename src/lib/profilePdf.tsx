@@ -126,7 +126,7 @@ export function ProfileDocument({ p }: { p: Profile }) {
     [[p.company, p.website ? `(${p.website})` : ''].filter(Boolean).join(' '), p.company || p.website ? 'Company' : null, hrefFor(p.website)],
   ];
   return (
-    <Document title={`${pdfText(p.name)} - Profile`} author="GAB" creator="GAB LinkedIn Outreach" producer="GAB">
+    <Document title={`${pdfText(p.name)} - Profile`} author="Impact Connect" creator="Impact Connect" producer="Impact Connect">
       <Page size="LETTER" style={s.page}>
         <View style={s.sideBg} fixed />
         <View style={s.side}>

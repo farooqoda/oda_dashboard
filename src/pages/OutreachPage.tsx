@@ -92,7 +92,7 @@ function ChatPromptPanel({ userId, clientId, inviteQuota }: { userId: string; cl
       title="How sending works"
       description={`Not connected: a connection request with your note (counts toward your daily invite limit${
         inviteQuota ? ` of ${inviteQuota}` : ''
-}, shared with the invites you mark as sent in the Lead Scraper popup). Already connected: your chat message (no daily limit). One lead at a time, with a 45–120 s pause.`}
+}, shared with the invites you mark as sent in the Find People popup). Already connected: your chat message (no daily limit). One lead at a time, with a 45–120 s pause.`}
       actions={
         <button type="button" className="btn-secondary" onClick={() => setOpen((v) => !v)}>
           {open ? 'Hide chat prompt' : 'Chat message prompt'}
@@ -107,7 +107,7 @@ function ChatPromptPanel({ userId, clientId, inviteQuota }: { userId: string; cl
           </label>
           <p className="text-xs text-slate-500">
             Who you are, what you offer, the tone, how to sign off. Any length. The AI also reads the lead's
-            profile and profiling notes. Connection notes are written by the Lead Scraper from your prompt on the Prompts page.
+            profile and profiling notes. Connection notes are written by Find People from your prompt on the Prompts page.
           </p>
           <textarea
             id="chat-prompt"
@@ -129,7 +129,7 @@ function ChatPromptPanel({ userId, clientId, inviteQuota }: { userId: string; cl
         </div>
       ) : (
         <p className="text-xs text-slate-500">
-          This app sends only what you queue here, through the GAB extension in your LinkedIn tab (task: Message Sender).
+          This app sends only what you queue here, through the extension in your LinkedIn tab (task: Message Studio).
           You can still copy a note and send it yourself, then press "Mark as contacted".
         </p>
       )}
@@ -572,7 +572,7 @@ export function OutreachPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Outreach" />
+        <PageHeader title="Message Studio" />
         <ErrorState error={error} onRetry={refresh} />
       </>
     );
@@ -581,8 +581,8 @@ export function OutreachPage() {
   return (
     <>
       <PageHeader
-        title="Outreach"
-        description="Leads with a drafted message. Review and edit, then send the ones you choose — the GAB extension sends them from your LinkedIn, one at a time. Or copy and send yourself."
+        title="Message Studio"
+        description="Draft personalized outreach messages. Review and edit, then send the ones you choose — the extension sends them from your LinkedIn, one at a time. Or copy and send yourself."
         actions={
           <button type="button" className="btn-secondary" onClick={refresh} disabled={refreshing}>
             {refreshing ? 'Refreshing…' : 'Refresh'}
@@ -618,8 +618,8 @@ export function OutreachPage() {
           <span>
             {queuedNotice} {queuedNotice === 1 ? 'lead is' : 'leads are'} queued.{' '}
             {extension.status === 'connected'
-              ? 'Your extension is now set to Message Sender. Open LinkedIn and press Start in the Message Sender panel.'
-              : 'Open LinkedIn with the GAB extension and choose Message Sender on the Dashboard.'}
+              ? 'Your extension is now set to Message Studio. Open LinkedIn and press Start in the Message Studio panel.'
+              : 'Open LinkedIn with the extension and choose Message Studio on the Dashboard.'}
           </span>
           <span className="flex items-center gap-2">
             <a href="https://www.linkedin.com/feed/" target="_blank" rel="noreferrer" className="btn-secondary">
@@ -697,8 +697,8 @@ export function OutreachPage() {
         <EmptyState title={tab === 'send' ? 'Nothing waiting to be sent' : 'No leads in this list'}>
           {tab === 'send'
             ? leads.length === 0
-              ? 'No leads are loaded yet. Sync profiles with the Lead Scraper first.'
-              : 'Every lead with a drafted message is already queued, sent or past the New Lead stage. New leads from the Lead Scraper appear here.'
+              ? 'No leads are loaded yet. Save profiles with Find People first.'
+              : 'Every lead with a drafted message is already queued, sent or past the New Lead stage. New people from Find People appear here.'
             : 'Nothing here right now.'}
         </EmptyState>
       ) : (
