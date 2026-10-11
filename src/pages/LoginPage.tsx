@@ -15,6 +15,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<FriendlyError | null>(null);
   const [busy, setBusy] = useState(false);
+  const linkError = (location.state as { linkError?: string } | null)?.linkError ?? null;
 
   // Already signed in: go where they were headed, or to the dashboard.
   if (status === 'ready' || status === 'unlinked') {
@@ -135,6 +136,14 @@ export function LoginPage() {
       }
     >
       <form onSubmit={onSignIn} className="space-y-4">
+        {linkError ? (
+          <div role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <p className="text-sm font-medium text-amber-900">That email link has expired or was already used.</p>
+            <p className="mt-1 text-xs text-amber-800">
+              Links work once and only for a short time. Choose “Forgot password?” below for a fresh one.
+            </p>
+          </div>
+        ) : null}
         {error ? <FormError error={error} /> : null}
 
         <Field

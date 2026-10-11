@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { readAuthLink } from './lib/authLink';
 import { RequireAuth } from './components/RequireAuth';
 import { Sidebar } from './components/Sidebar';
 import { AuthProvider } from './data/AuthProvider';
@@ -79,9 +80,31 @@ function Shell() {
   );
 }
 
+/**
+ * Emailed links can land on any address — Supabase falls back to the Site URL
+ * whenever the requested one is not on its allow-list. Once, on first load,
+ * send a reset link to the new-password form and a failed link to sign-in
+ * with an explanation, instead of letting the normal gate swallow it.
+ */
+function EmailLinkRedirect() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current) return;
+    done.current = true;
+    if (location.pathname === '/reset-password') return; // that page handles its own link
+    const link = readAuthLink();
+    if (link.isRecovery) navigate('/reset-password', { replace: true });
+    else if (link.errorCode) navigate('/login', { replace: true, state: { linkError: link.errorCode } });
+  }, [location.pathname, navigate]);
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
+      <EmailLinkRedirect />
       <Routes>
         {/* Public. These are the only routes reachable without a session.
             /reset-password is here, not behind RequireAuth, on purpose: the
