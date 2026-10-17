@@ -1,3 +1,4 @@
+import { isMissingColumn } from './engagers';
 import { supabase, supabaseConfigError, toFriendlyError, type FriendlyError } from './supabase';
 
 /**
@@ -23,6 +24,10 @@ export interface SearchLead {
   claimed_at: string | null;
   done_at: string | null;
   created_at: string;
+  /** v4.22: found through a post (Collect engagers): what they did there. */
+  engagement_kind?: 'comment' | 'reaction' | 'repost' | null;
+  engagement_text?: string | null;
+  engagement_author?: string | null;
 }
 
 type Result<T> = { data: T; error: null } | { data: null; error: FriendlyError };
@@ -34,16 +39,25 @@ const COLUMNS =
   'id, linkedin_url, full_name, headline, location, degree, search_url, search_label, status, error, attempts, queued_at, claimed_at, done_at, created_at';
 export const MAX_ROWS = 3000;
 
+const ENGAGEMENT_COLUMNS = ', engagement_kind, engagement_text, engagement_author';
+let withEngagement = true;
+
 export async function loadSearchLeads(): Promise<Result<SearchLead[]>> {
   if (!supabase) return notConfigured();
-  const { data, error } = await supabase
-    .from('gab_search_leads')
-    .select(COLUMNS)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: true })
-    .range(0, MAX_ROWS - 1);
+  const fetchRows = (cols: string) =>
+    supabase!
+      .from('gab_search_leads')
+      .select(cols)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(0, MAX_ROWS - 1);
+  let { data, error } = await fetchRows(COLUMNS + (withEngagement ? ENGAGEMENT_COLUMNS : ''));
+  if (error && withEngagement && isMissingColumn(error)) {
+    withEngagement = false; // engagement SQL not run yet
+    ({ data, error } = await fetchRows(COLUMNS));
+  }
   if (error) return { data: null, error: toFriendlyError(error) };
-  return { data: (data ?? []) as SearchLead[], error: null };
+  return { data: (data ?? []) as unknown as SearchLead[], error: null };
 }
 
 /** Which moves the dashboard may make (the database enforces the same). */

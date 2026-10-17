@@ -92,6 +92,16 @@ export interface Post {
   ai_comment_draft: string | null;
   comment_status: CommentStatus | null;
   comment_posted_at: string | null;
+  /** Engagement shown on the post when it was scraped (null = not read yet). */
+  reactions_count?: number | null;
+  comments_count?: number | null;
+  reposts_count?: number | null;
+  counts_at?: string | null;
+  /** "Collect engagers": none -> requested -> collecting -> done | failed. */
+  engagers_status?: 'none' | 'requested' | 'collecting' | 'done' | 'failed' | null;
+  engagers_found?: number | null;
+  engagers_error?: string | null;
+  engagers_done_at?: string | null;
 }
 
 /** Where a post is in the comment workflow (see gab_comments_schema.sql). */
