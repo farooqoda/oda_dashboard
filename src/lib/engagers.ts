@@ -99,3 +99,37 @@ export async function deleteEngagers(ids: number[]): Promise<Result<number>> {
   if (error) return { data: null, error: toFriendlyError(error) };
   return { data: data?.length ?? 0, error: null };
 }
+
+// ---------------------------------------------------------------------------
+// Pause between posts while the extension collects (per member)
+// ---------------------------------------------------------------------------
+export type EngagersPace = 'careful' | 'normal' | 'fast';
+export const PACES: Array<{ key: EngagersPace; label: string; range: string; hint: string }> = [
+  { key: 'careful', label: 'Careful', range: '45–120 s', hint: 'Safest for your LinkedIn account' },
+  { key: 'normal', label: 'Normal', range: '15–35 s', hint: 'Recommended' },
+  { key: 'fast', label: 'Fast', range: '8–15 s', hint: 'Quicker, a little more risk' },
+];
+
+export async function loadEngagersPace(userId: string): Promise<Result<EngagersPace>> {
+  if (!supabase) return notConfigured();
+  const { data, error } = await supabase.from('gab_comment_settings').select('engagers_pace').eq('user_id', userId).maybeSingle();
+  if (error) return { data: null, error: toFriendlyError(error) };
+  const v = (data as { engagers_pace?: string } | null)?.engagers_pace;
+  return { data: v === 'careful' || v === 'fast' ? v : 'normal', error: null };
+}
+
+export async function saveEngagersPace(userId: string, clientId: string | null, pace: EngagersPace): Promise<Result<true>> {
+  if (!supabase) return notConfigured();
+  const { data: existing, error: readError } = await supabase
+    .from('gab_comment_settings')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (readError) return { data: null, error: toFriendlyError(readError) };
+  const row = { engagers_pace: pace, updated_at: new Date().toISOString() };
+  const { error } = existing
+    ? await supabase.from('gab_comment_settings').update(row).eq('user_id', userId)
+    : await supabase.from('gab_comment_settings').insert({ user_id: userId, client_id: clientId, ...row });
+  if (error) return { data: null, error: toFriendlyError(error) };
+  return { data: true, error: null };
+}

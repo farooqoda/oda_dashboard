@@ -4,7 +4,8 @@ import { CopyButton, EmptyState, ErrorState, PageHeader, SkeletonTable } from '.
 import { MAX_ROWS } from '../lib/constants';
 import { downloadCsv, postsToCsv } from '../lib/csv';
 import { formatDateTime } from '../lib/format';
-import { isMissingColumn, type EngagerKind } from '../lib/engagers';
+import { useAuth } from '../data/AuthProvider';
+import { PACES, isMissingColumn, loadEngagersPace, saveEngagersPace, type EngagerKind, type EngagersPace } from '../lib/engagers';
 import { supabase, supabaseConfigError, toFriendlyError, type FriendlyError } from '../lib/supabase';
 import type { Post } from '../lib/types';
 
@@ -73,6 +74,22 @@ export function PostsPage() {
   const [panel, setPanel] = useState<{ id: string; tab: 'all' | EngagerKind } | null>(null);
   const inFlight = useRef(false);
   const withEngagement = useRef(true);
+  const { user, clientId } = useAuth();
+  const userId = user?.id ?? null;
+  const [pace, setPace] = useState<EngagersPace>('normal');
+  const [paceSaved, setPaceSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    if (userId) void loadEngagersPace(userId).then((r) => r.data && setPace(r.data));
+  }, [userId]);
+
+  const choosePace = async (v: EngagersPace) => {
+    if (!userId) return;
+    setPace(v);
+    setPaceSaved('saving');
+    const r = await saveEngagersPace(userId, clientId ?? null, v);
+    setPaceSaved(r.error ? 'error' : 'saved');
+  };
 
   const load = useCallback(async (silent = false) => {
     if (!supabase || inFlight.current) return;
@@ -199,6 +216,29 @@ export function PostsPage() {
             {query.trim() ? ` matching “${query.trim()}”` : ''} · click a row to read the full text
             {hasEngagement ? ' · click 👍 💬 🔁 to see who engaged and collect them' : ''}
           </p>
+          {hasEngagement ? (
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-700" role="group" aria-label="Pause between posts">
+              <span>Collecting engagers on LinkedIn — pause between posts:</span>
+              {PACES.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  title={p.hint}
+                  aria-pressed={pace === p.key}
+                  onClick={() => void choosePace(p.key)}
+                  className={`rounded-full border px-3 py-1 ${
+                    pace === p.key ? 'border-ink bg-ink text-white' : 'border-slate-300 bg-white text-slate-800 hover:border-slate-500'
+                  }`}
+                >
+                  {p.label} <span className="opacity-70">{p.range}</span>
+                  {p.key === 'normal' ? <span className="opacity-70"> · recommended</span> : null}
+                </button>
+              ))}
+              <span className="text-slate-500" aria-live="polite">
+                {paceSaved === 'saving' ? 'Saving…' : paceSaved === 'saved' ? 'Saved — used from the next post' : paceSaved === 'error' ? 'Could not save' : ''}
+              </span>
+            </div>
+          ) : null}
           {!hasEngagement ? (
             <p className="mb-3 rounded-2xl bg-sun-50 px-4 py-2.5 text-xs text-ink">
               Reaction, comment and repost counts appear here once the latest database update is installed.
