@@ -133,3 +133,20 @@ export async function saveEngagersPace(userId: string, clientId: string | null, 
   if (error) return { data: null, error: toFriendlyError(error) };
   return { data: true, error: null };
 }
+
+/** "Collect engagers for all": queue many posts at once. Returns how many were queued. */
+export async function requestEngagersMany(postIds: string[]): Promise<Result<number>> {
+  if (!supabase) return notConfigured();
+  let n = 0;
+  for (let i = 0; i < postIds.length; i += 200) {
+    const { data, error } = await supabase
+      .from('gab_posts')
+      .update({ engagers_status: 'requested' })
+      .in('id', postIds.slice(i, i + 200))
+      .in('engagers_status', ['none', 'failed'])
+      .select('id');
+    if (error) return { data: null, error: toFriendlyError(error) };
+    n += data?.length ?? 0;
+  }
+  return { data: n, error: null };
+}
