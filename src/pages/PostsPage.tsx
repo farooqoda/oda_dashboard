@@ -5,7 +5,7 @@ import { MAX_ROWS } from '../lib/constants';
 import { downloadCsv, postsToCsv } from '../lib/csv';
 import { formatDateTime } from '../lib/format';
 import { useAuth } from '../data/AuthProvider';
-import { PACES, isMissingColumn, loadEngagersPace, saveEngagersPace, type EngagerKind, type EngagersPace } from '../lib/engagers';
+import { PACES, isMissingColumn, loadEngagersPace, requestEngagersMany, saveEngagersPace, type EngagerKind, type EngagersPace } from '../lib/engagers';
 import { supabase, supabaseConfigError, toFriendlyError, type FriendlyError } from '../lib/supabase';
 import type { Post } from '../lib/types';
 
@@ -135,6 +135,31 @@ export function PostsPage() {
   }, [posts, query, sort]);
   const panelPost = panel ? posts.find((p) => p.id === panel.id) ?? null : null;
 
+  // Posts shown that have engagement and were never collected (or failed): one click queues them all.
+  const collectable = useMemo(
+    () =>
+      filtered.filter(
+        (p) => p.post_url.startsWith('http') && total(p) > 0 && (p.engagers_status === 'none' || p.engagers_status === 'failed' || !p.engagers_status),
+      ),
+    [filtered],
+  );
+  const waitingCount = useMemo(() => posts.filter((p) => p.engagers_status === 'requested' || p.engagers_status === 'collecting').length, [posts]);
+  const [bulkNote, setBulkNote] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const collectAll = async () => {
+    if (!collectable.length) return;
+    if (!window.confirm(`Queue ${collectable.length} ${collectable.length === 1 ? 'post' : 'posts'} for engager collection? The extension collects them one at a time, within your daily limit.`)) return;
+    setBulkBusy(true);
+    const r = await requestEngagersMany(collectable.map((p) => p.id));
+    setBulkBusy(false);
+    setBulkNote(
+      r.error
+        ? `Could not queue them: ${r.error.message}`
+        : `${r.data} queued. On LinkedIn (Discover Conversations task) press “▶️ Collect engagers” in the panel at the bottom left.`,
+    );
+    void load(true);
+  };
+
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -218,7 +243,17 @@ export function PostsPage() {
           </p>
           {hasEngagement ? (
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-700" role="group" aria-label="Pause between posts">
-              <span>Collecting engagers on LinkedIn — pause between posts:</span>
+              <button
+                type="button"
+                className="btn-primary mr-2 py-1 text-xs"
+                disabled={!collectable.length || bulkBusy}
+                onClick={() => void collectAll()}
+                title="Queue every post shown that has engagement and was not collected yet"
+              >
+                {bulkBusy ? 'Queuing…' : `👥 Collect engagers for all (${collectable.length})`}
+              </button>
+              {waitingCount ? <span className="mr-2 text-slate-600">{waitingCount} waiting for the extension ·</span> : null}
+              <span>Pause between posts:</span>
               {PACES.map((p) => (
                 <button
                   key={p.key}
@@ -238,6 +273,11 @@ export function PostsPage() {
                 {paceSaved === 'saving' ? 'Saving…' : paceSaved === 'saved' ? 'Saved — used from the next post' : paceSaved === 'error' ? 'Could not save' : ''}
               </span>
             </div>
+          ) : null}
+          {bulkNote ? (
+            <p role="status" className="mb-3 rounded-2xl bg-sun-50 px-4 py-2.5 text-xs text-ink">
+              {bulkNote}
+            </p>
           ) : null}
           {!hasEngagement ? (
             <p className="mb-3 rounded-2xl bg-sun-50 px-4 py-2.5 text-xs text-ink">
