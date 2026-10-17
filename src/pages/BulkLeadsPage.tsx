@@ -372,6 +372,13 @@ export function BulkLeadsPage() {
                       {isLead ? <span className="pill border-violet-200 bg-violet-50 text-violet-800">Already a lead</span> : null}
                     </div>
                     {r.headline ? <p className="mt-0.5 line-clamp-2 text-sm text-slate-700">{r.headline}</p> : null}
+                    {r.engagement_kind ? (
+                      <p className="mt-1 line-clamp-2 text-xs text-slate-700">
+                        {r.engagement_kind === 'comment' ? '💬 Commented on ' : r.engagement_kind === 'repost' ? '🔁 Reposted ' : '👍 Reacted to '}
+                        {r.engagement_author ? `${r.engagement_author}’s post` : 'a post'}
+                        {r.engagement_text ? `: “${r.engagement_text}”` : ''}
+                      </p>
+                    ) : null}
                     <p className="mt-0.5 text-xs text-slate-500">
                       {[r.location, r.search_label ? `from “${r.search_label}”` : null].filter(Boolean).join(' · ')}
                     </p>
