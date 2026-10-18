@@ -135,11 +135,18 @@ export function PostsPage() {
   }, [posts, query, sort]);
   const panelPost = panel ? posts.find((p) => p.id === panel.id) ?? null : null;
 
-  // Posts shown that have engagement and were never collected (or failed): one click queues them all.
+  // Posts shown that were never collected (or failed, or gave 0 people): one click queues them all.
   const collectable = useMemo(
     () =>
       filtered.filter(
-        (p) => p.post_url.startsWith('http') && total(p) > 0 && (p.engagers_status === 'none' || p.engagers_status === 'failed' || !p.engagers_status),
+        // Counts read from LinkedIn can be missing or wrongly 0, so they do not decide this;
+        // a post collected with 0 people can be tried again too.
+        (p) =>
+          p.post_url.startsWith('http') &&
+          (p.engagers_status === 'none' ||
+            p.engagers_status === 'failed' ||
+            !p.engagers_status ||
+            (p.engagers_status === 'done' && !p.engagers_found)),
       ),
     [filtered],
   );
@@ -248,7 +255,7 @@ export function PostsPage() {
                 className="btn-primary mr-2 py-1 text-xs"
                 disabled={!collectable.length || bulkBusy}
                 onClick={() => void collectAll()}
-                title="Queue every post shown that has engagement and was not collected yet"
+                title="Queue every post shown that was not collected yet (or gave 0 people)"
               >
                 {bulkBusy ? 'Queuing…' : `👥 Collect engagers for all (${collectable.length})`}
               </button>

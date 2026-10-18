@@ -143,7 +143,7 @@ export async function requestEngagersMany(postIds: string[]): Promise<Result<num
       .from('gab_posts')
       .update({ engagers_status: 'requested' })
       .in('id', postIds.slice(i, i + 200))
-      .in('engagers_status', ['none', 'failed'])
+      .in('engagers_status', ['none', 'failed', 'done'])
       .select('id');
     if (error) return { data: null, error: toFriendlyError(error) };
     n += data?.length ?? 0;
