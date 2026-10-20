@@ -204,8 +204,11 @@ function LeadRow({
             >
               {displayName(lead)}
             </button>
-            <p className="truncate text-xs text-slate-600" title={lead.company ?? undefined}>
-              {lead.company?.trim() || 'No company recorded'}
+            <p
+              className="line-clamp-2 break-words text-xs text-slate-600"
+              title={[lead.title?.trim(), lead.company?.trim()].filter(Boolean).join(' · ') || undefined}
+            >
+              {[lead.title?.trim(), lead.company?.trim()].filter(Boolean).join(' · ') || 'No title recorded'}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <TypePill type={personalityType(lead.traits)} />

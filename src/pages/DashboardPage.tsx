@@ -46,8 +46,11 @@ function LeadCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
           <p className="truncate text-sm font-medium text-slate-900" title={displayName(lead)}>
             {displayName(lead)}
           </p>
-          <p className="truncate text-xs text-slate-600" title={lead.company ?? undefined}>
-            {lead.company?.trim() || 'No company recorded'}
+          <p
+            className="truncate text-xs text-slate-600"
+            title={[lead.title?.trim(), lead.company?.trim()].filter(Boolean).join(' · ') || undefined}
+          >
+            {[lead.title?.trim(), lead.company?.trim()].filter(Boolean).join(' · ') || 'No title recorded'}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {type ? <TypePill type={type} /> : null}
