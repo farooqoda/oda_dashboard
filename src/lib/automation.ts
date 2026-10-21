@@ -22,6 +22,10 @@ export interface AutomationSettings {
   last_warning_text: string | null;
   inbox_checked_at: string | null;
   inbox_last_result: { replies?: number; accepted?: number; conversations?: number; connections?: number } | null;
+  /** Batch B: 'approve' = follow-ups wait in Message Studio; 'auto' = sent without asking. */
+  followup_mode: 'approve' | 'auto';
+  /** Days to wait: [first follow-up after the first message, second after the first follow-up, …] */
+  followup_days: number[];
 }
 
 export const DEFAULT_AUTOMATION: AutomationSettings = {
@@ -37,6 +41,8 @@ export const DEFAULT_AUTOMATION: AutomationSettings = {
   last_warning_text: null,
   inbox_checked_at: null,
   inbox_last_result: null,
+  followup_mode: 'approve',
+  followup_days: [4, 7],
 };
 
 export function guessTimeZone(): string {
@@ -50,7 +56,7 @@ export function guessTimeZone(): string {
 export const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const COLUMNS =
-  'schedule_on, work_days, work_start, work_end, work_tz, warmup_on, warmup_started_on, safety_paused_until, last_warning_at, last_warning_text, inbox_checked_at, inbox_last_result';
+  'schedule_on, work_days, work_start, work_end, work_tz, warmup_on, warmup_started_on, safety_paused_until, last_warning_at, last_warning_text, inbox_checked_at, inbox_last_result, followup_mode, followup_days';
 
 type Result<T> = { data: T; error: null } | { data: null; error: FriendlyError };
 
@@ -73,13 +79,18 @@ export async function loadAutomation(userId: string): Promise<Result<AutomationS
       work_start: hhmm(row.work_start, '09:00'),
       work_end: hhmm(row.work_end, '18:00'),
       work_tz: typeof row.work_tz === 'string' && row.work_tz ? row.work_tz : DEFAULT_AUTOMATION.work_tz,
+      followup_mode: row.followup_mode === 'auto' ? 'auto' : 'approve',
+      followup_days: Array.isArray(row.followup_days) ? (row.followup_days as unknown[]).map(Number).filter((n) => n > 0) : [4, 7],
     },
     error: null,
   };
 }
 
 export type AutomationPatch = Partial<
-  Pick<AutomationSettings, 'schedule_on' | 'work_days' | 'work_start' | 'work_end' | 'work_tz' | 'warmup_on' | 'safety_paused_until'>
+  Pick<
+    AutomationSettings,
+    'schedule_on' | 'work_days' | 'work_start' | 'work_end' | 'work_tz' | 'warmup_on' | 'safety_paused_until' | 'followup_mode' | 'followup_days'
+  >
 >;
 
 export async function saveAutomation(userId: string, clientId: string | null, patch: AutomationPatch): Promise<FriendlyError | null> {
