@@ -13,12 +13,13 @@ import {
   TypePill,
 } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
+import { InboxCheckLine, SafetyBanner } from '../components/Automation';
 import { useLeads } from '../data/LeadsProvider';
 import { CHAT_CHAR_LIMIT, DEFAULT_STAGE } from '../lib/constants';
 import { useInviteLimit } from '../lib/prompts';
 import { Link } from 'react-router-dom';
 import { useExtensionTask } from '../lib/extensionBridge';
-import { displayName, formatDateTime, stageOf } from '../lib/format';
+import { displayName, formatDate, formatDateTime, stageOf } from '../lib/format';
 import {
   cancelQueuedLeads,
   loadChatPrompt,
@@ -215,6 +216,12 @@ function LeadRow({
               <StagePill stage={stageOf(lead)} />
             </div>
             {lead.connection_status ? <p className="mt-1 text-[11px] text-slate-500">{lead.connection_status}</p> : null}
+            {lead.reply_snippet ? (
+              <p className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] text-emerald-900" title={lead.reply_snippet}>
+                💬 Replied{lead.reply_detected_at ? ` ${formatDate(lead.reply_detected_at)}` : ''}: “{lead.reply_snippet.replace(/^[^:]{1,40}:\s*/, '').slice(0, 90)}
+                {lead.reply_snippet.length > 90 ? '…' : ''}”
+              </p>
+            ) : null}
             {hasLink ? (
               <a href={lead.linkedin_url!} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-medium text-brand-700 hover:underline">
                 Open profile ↗
@@ -592,6 +599,11 @@ export function OutreachPage() {
           </button>
         }
       />
+
+      <SafetyBanner />
+      <div className="mb-4">
+        <InboxCheckLine />
+      </div>
 
       {userId ? <ChatPromptPanel userId={userId} clientId={clientId} inviteQuota={inviteQuota} /> : null}
 

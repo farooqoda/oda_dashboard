@@ -1,3 +1,4 @@
+import { SafetyBanner } from '../components/Automation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LeadModal } from '../components/modal/LeadModal';
 import {
@@ -153,6 +154,7 @@ export function DashboardPage() {
 
   return (
     <>
+      <SafetyBanner />
       {/* Hero: greeting, tagline, headline bars and the three big numbers. */}
       <section className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
         <div className="min-w-0">

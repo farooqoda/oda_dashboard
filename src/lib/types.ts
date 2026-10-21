@@ -49,6 +49,10 @@ export interface Lead {
   invite_status?: 'none' | 'draft_requested' | 'drafting' | null;
   invite_owner?: string | null;
   invite_error?: string | null;
+  /** Batch A (extension v4.24): found by the extension's inbox / connections check. */
+  reply_detected_at?: string | null;
+  reply_snippet?: string | null;
+  connected_detected_at?: string | null;
 }
 
 export type ChatStatus = 'none' | 'draft_requested' | 'drafting' | 'drafted';
