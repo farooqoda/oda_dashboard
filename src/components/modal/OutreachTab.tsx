@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../lib/format';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLeads } from '../../data/LeadsProvider';
 import { useAuth } from '../../data/AuthProvider';
@@ -394,6 +395,16 @@ function ReplySection({
 
   return (
     <div className="space-y-4">
+      {lead.reply_snippet ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+          <p className="text-xs font-medium text-emerald-800">
+            💬 Their latest message, seen in your LinkedIn inbox
+            {lead.reply_detected_at ? ` (first reply ${formatDateTime(lead.reply_detected_at)})` : ''}
+          </p>
+          <p className="mt-1 whitespace-pre-wrap">{lead.reply_snippet}</p>
+          <p className="mt-1 text-[11px] text-emerald-800">LinkedIn only shows the start of the message in the inbox list.</p>
+        </div>
+      ) : null}
       <p className="text-xs text-slate-600">
         This dashboard cannot read LinkedIn. Paste the thread here and a reply is drafted from
         it — you still send it yourself.

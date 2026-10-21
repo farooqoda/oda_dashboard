@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { AutomationCard } from '../components/Automation';
 import { Card, CopyButton, PageHeader } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
 import { fetchAccountRecord, updatePassword, validateNewPassword, type AccountRecord } from '../lib/auth';
 import { MAX_ROWS, SUPPORT_EMAIL } from '../lib/constants';
+import { loadInviteQuota } from '../lib/messages';
 import { supabase, supabaseConfigError, type FriendlyError } from '../lib/supabase';
 
 /**
@@ -308,6 +310,10 @@ export function SettingsPage() {
   const { count, failed, loading } = useAccountLeadCount();
   const record = useAccountRecord(user?.id);
   const [signingOut, setSigningOut] = useState(false);
+  const [inviteQuota, setInviteQuota] = useState<number | null>(null);
+  useEffect(() => {
+    if (user) void loadInviteQuota(user.id).then(setInviteQuota);
+  }, [user]);
 
   const connected = !leadsError && !failed;
 
@@ -318,7 +324,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Read-only. Nothing on this screen changes anything." />
+      <PageHeader title="Settings" description="Your account, working hours and account safety." />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Your account">
@@ -418,6 +424,10 @@ export function SettingsPage() {
             </p>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <AutomationCard dailyInviteLimit={inviteQuota} />
+        </div>
       </div>
     </>
   );
