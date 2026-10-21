@@ -15,11 +15,12 @@ import {
 import { useAuth } from '../data/AuthProvider';
 import { InboxCheckLine, SafetyBanner, useAutomation } from '../components/Automation';
 import { FollowupList } from '../components/FollowupsPanel';
+import { AutoStartNotice } from '../components/Today';
 import { draftNow, isFirstMessage, isFollowupItem, isReplyItem } from '../lib/followups';
 import { useLeads } from '../data/LeadsProvider';
 import { CHAT_CHAR_LIMIT, DEFAULT_STAGE } from '../lib/constants';
 import { useInviteLimit } from '../lib/prompts';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useExtensionTask } from '../lib/extensionBridge';
 import { displayName, formatDate, formatDateTime, stageOf } from '../lib/format';
 import {
@@ -358,7 +359,18 @@ export function OutreachPage() {
   const [drafting, setDrafting] = useState(false);
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
 
-  const [tab, setTab] = useState<TabKey>('send');
+  const [params, setParams] = useSearchParams();
+  const wanted = params.get('tab') as TabKey | null;
+  const [tab, setTabState] = useState<TabKey>(wanted && TABS.some((t) => t.key === wanted) ? wanted : 'send');
+  // Batch C: the bell and the morning email link straight to a tab (?tab=replies)
+  useEffect(() => {
+    if (wanted && wanted !== tab && TABS.some((t) => t.key === wanted)) setTabState(wanted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted]);
+  const setTab = (t: TabKey) => {
+    setTabState(t);
+    setParams(t === 'send' ? {} : { tab: t }, { replace: true });
+  };
   const followupTab = tab === 'followups' || tab === 'replies';
   const [openId, setOpenId] = useState<number | null>(null);
   const [notes, setNotes] = useState<Record<number, string>>({});
@@ -631,6 +643,7 @@ export function OutreachPage() {
       <div className="mb-4">
         <InboxCheckLine />
       </div>
+      <AutoStartNotice />
 
       {userId ? <ChatPromptPanel userId={userId} clientId={clientId} inviteQuota={inviteQuota} /> : null}
 

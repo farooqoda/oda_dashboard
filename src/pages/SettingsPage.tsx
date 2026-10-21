@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AutomationCard } from '../components/Automation';
+import { AutomationCard, MorningEmailCard } from '../components/Automation';
 import { Card, CopyButton, PageHeader } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
@@ -425,8 +425,9 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <div className="lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
           <AutomationCard dailyInviteLimit={inviteQuota} />
+          <MorningEmailCard />
         </div>
       </div>
     </>

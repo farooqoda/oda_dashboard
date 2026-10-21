@@ -1,4 +1,5 @@
 import { SafetyBanner } from '../components/Automation';
+import { TodayCard } from '../components/Today';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LeadModal } from '../components/modal/LeadModal';
 import {
@@ -190,6 +191,8 @@ export function DashboardPage() {
           </button>
         </div>
       </section>
+
+      <TodayCard />
 
       {/* Widgets, laid out like the design: three columns plus the dark queue. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
