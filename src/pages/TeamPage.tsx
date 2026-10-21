@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChartCard, ColumnChart } from '../components/charts';
 import { EmptyState, ErrorState, PageHeader, SkeletonCards } from '../components/ui';
 import { formatDateTime } from '../lib/format';
@@ -218,6 +219,13 @@ export function TeamPage() {
     <>
       <PageHeader
         title="Team"
+        actions={
+          admin ? (
+            <Link to="/team/manage" className="btn-primary">
+              Manage teams
+            </Link>
+          ) : undefined
+        }
         description={
           admin
             ? 'Admin view: every client and every member. Pick a date range to see how much work Impact Connect did.'
