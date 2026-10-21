@@ -26,6 +26,14 @@ export interface AutomationSettings {
   followup_mode: 'approve' | 'auto';
   /** Days to wait: [first follow-up after the first message, second after the first follow-up, …] */
   followup_days: number[];
+  /** Batch C: the morning email ("today" list) and what the extension last reported. */
+  digest_on: boolean;
+  digest_hour: number;
+  ext_auto: { ms?: boolean; bl?: boolean; eg?: boolean } | null;
+  ext_seen_at: string | null;
+  ext_version: string | null;
+  /** false until the Batch C database step is run (then the ext_* fields mean something). */
+  batch_c: boolean;
 }
 
 export const DEFAULT_AUTOMATION: AutomationSettings = {
@@ -43,6 +51,12 @@ export const DEFAULT_AUTOMATION: AutomationSettings = {
   inbox_last_result: null,
   followup_mode: 'approve',
   followup_days: [4, 7],
+  digest_on: true,
+  digest_hour: 8,
+  ext_auto: null,
+  ext_seen_at: null,
+  ext_version: null,
+  batch_c: false,
 };
 
 export function guessTimeZone(): string {
@@ -57,19 +71,26 @@ export const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const COLUMNS =
   'schedule_on, work_days, work_start, work_end, work_tz, warmup_on, warmup_started_on, safety_paused_until, last_warning_at, last_warning_text, inbox_checked_at, inbox_last_result, followup_mode, followup_days';
+const COLUMNS_C = ', digest_on, digest_hour, ext_auto, ext_seen_at, ext_version';
 
 type Result<T> = { data: T; error: null } | { data: null; error: FriendlyError };
 
 /** null data + missing=true: the Batch A database step has not been run yet. */
 export async function loadAutomation(userId: string): Promise<Result<AutomationSettings> & { missing?: boolean }> {
   if (!supabase) return { data: null, error: { message: supabaseConfigError ?? 'Not configured', hint: null, code: 'CONFIG' } };
-  const { data, error } = await supabase.from('gab_comment_settings').select(COLUMNS).eq('user_id', userId).maybeSingle();
+  // Batch C columns are optional: before that database step, load without them.
+  let batchC = true;
+  let { data, error } = await supabase.from('gab_comment_settings').select(COLUMNS + COLUMNS_C).eq('user_id', userId).maybeSingle();
+  if (error && isMissingColumn(error)) {
+    batchC = false;
+    ({ data, error } = await supabase.from('gab_comment_settings').select(COLUMNS).eq('user_id', userId).maybeSingle());
+  }
   if (error) {
     if (isMissingColumn(error)) return { data: null, error: toFriendlyError(error), missing: true };
     return { data: null, error: toFriendlyError(error) };
   }
-  if (!data) return { data: { ...DEFAULT_AUTOMATION }, error: null };
-  const row = data as Record<string, unknown>;
+  if (!data) return { data: { ...DEFAULT_AUTOMATION, batch_c: batchC }, error: null };
+  const row = data as unknown as Record<string, unknown>;
   const hhmm = (v: unknown, d: string) => (typeof v === 'string' && /^\d{2}:\d{2}/.test(v) ? v.slice(0, 5) : d);
   return {
     data: {
@@ -81,6 +102,9 @@ export async function loadAutomation(userId: string): Promise<Result<AutomationS
       work_tz: typeof row.work_tz === 'string' && row.work_tz ? row.work_tz : DEFAULT_AUTOMATION.work_tz,
       followup_mode: row.followup_mode === 'auto' ? 'auto' : 'approve',
       followup_days: Array.isArray(row.followup_days) ? (row.followup_days as unknown[]).map(Number).filter((n) => n > 0) : [4, 7],
+      digest_on: row.digest_on !== false,
+      digest_hour: Number.isInteger(row.digest_hour) ? Number(row.digest_hour) : 8,
+      batch_c: batchC,
     },
     error: null,
   };
@@ -89,7 +113,7 @@ export async function loadAutomation(userId: string): Promise<Result<AutomationS
 export type AutomationPatch = Partial<
   Pick<
     AutomationSettings,
-    'schedule_on' | 'work_days' | 'work_start' | 'work_end' | 'work_tz' | 'warmup_on' | 'safety_paused_until' | 'followup_mode' | 'followup_days'
+    'schedule_on' | 'work_days' | 'work_start' | 'work_end' | 'work_tz' | 'warmup_on' | 'safety_paused_until' | 'followup_mode' | 'followup_days' | 'digest_on' | 'digest_hour'
   >
 >;
 

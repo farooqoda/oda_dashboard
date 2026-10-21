@@ -94,6 +94,8 @@ export const DRAFT_CHAT_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-cha
 export const DRAFT_INVITE_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-invite-notes';
 /** Batch B: write due follow-ups and reply drafts for one member now (it also runs every 10 minutes). */
 export const FOLLOWUPS_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/followups';
+/** Batch C: send this member's morning email now (a test). */
+export const DIGEST_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/digest';
 
 /** Upper bound for a chat message the dashboard lets you queue. */
 export const CHAT_CHAR_LIMIT = 2000;

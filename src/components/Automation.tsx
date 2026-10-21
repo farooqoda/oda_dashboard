@@ -11,8 +11,11 @@ import {
   type AutomationSettings,
 } from '../lib/automation';
 import { formatDateTime } from '../lib/format';
+import { sendTestDigest } from '../lib/today';
 import type { FriendlyError } from '../lib/supabase';
 import { Card, InlineError } from './ui';
+
+const CHANGED = 'gab-automation-changed';
 
 /** The signed-in member's automation settings (working hours, warm-up, safety, inbox check). */
 export function useAutomation() {
@@ -35,11 +38,21 @@ export function useAutomation() {
     void reload();
   }, [reload]);
 
+  // Several parts of the page use these settings (banner, Today, bell): keep them in step.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const patch = (e as CustomEvent<AutomationPatch>).detail;
+      setSettings((s) => (s ? { ...s, ...patch } : s));
+    };
+    window.addEventListener(CHANGED, on);
+    return () => window.removeEventListener(CHANGED, on);
+  }, []);
+
   const save = useCallback(
     async (patch: AutomationPatch) => {
       if (!user) return null;
       const err = await saveAutomation(user.id, clientId, patch);
-      if (!err) setSettings((s) => (s ? { ...s, ...patch } : s));
+      if (!err) window.dispatchEvent(new CustomEvent<AutomationPatch>(CHANGED, { detail: patch }));
       return err;
     },
     [user, clientId],
@@ -339,3 +352,83 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
     </Card>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Settings card: the morning email (Batch C)
+// ---------------------------------------------------------------------------
+export function MorningEmailCard() {
+  const { user } = useAuth();
+  const { settings, missing, loading, save } = useAutomation();
+  const [on, setOn] = useState<boolean | null>(null);
+  const [hour, setHour] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [err, setErr] = useState<FriendlyError | null>(null);
+  if (loading || missing || !settings) return null;
+  if (!settings.batch_c) {
+    return (
+      <Card title="Morning email">
+        <p className="text-sm text-slate-600">This needs the latest database update (Batch C). Ask your administrator to run it, then reload this page.</p>
+      </Card>
+    );
+  }
+  const curOn = on ?? settings.digest_on;
+  const curHour = hour ?? settings.digest_hour;
+  const changed = curOn !== settings.digest_on || curHour !== settings.digest_hour;
+  const onSave = async () => {
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    const e = await save({ digest_on: curOn, digest_hour: curHour });
+    setBusy(false);
+    if (e) setErr(e);
+    else {
+      setOn(null);
+      setHour(null);
+      setNote('Saved.');
+    }
+  };
+  const onTest = async () => {
+    if (!user) return;
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    const e = await sendTestDigest(user.id);
+    setBusy(false);
+    if (e) setErr(e);
+    else setNote(`Test email sent to ${user.email ?? 'you'}. Check your inbox (and spam).`);
+  };
+  const fmt = (h: number) => `${((h + 11) % 12) + 1}:00 ${h < 12 ? 'AM' : 'PM'}`;
+  return (
+    <Card title="Morning email" description="Your “Today” list by email: who wrote back, follow-ups to approve, failed sends, and anything blocking your automation.">
+      <div className="space-y-3 text-sm">
+        <label className="flex items-center gap-2 font-medium text-slate-900">
+          <input type="checkbox" checked={curOn} onChange={(e) => setOn(e.target.checked)} />
+          Send me the morning email
+        </label>
+        <label className="flex items-center gap-2">
+          At
+          <select className="input w-32 py-1" aria-label="Morning email time" value={curHour} disabled={!curOn} onChange={(e) => setHour(Number(e.target.value))}>
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {fmt(h)}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-slate-500">your time ({settings.work_tz}), on your working days. Only sent when there is something to do.</span>
+        </label>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button type="button" className="btn-primary" disabled={busy || !changed} onClick={() => void onSave()}>
+            Save email settings
+          </button>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void onTest()}>
+            {busy ? 'Working…' : 'Send me a test email now'}
+          </button>
+          {note ? <span className="text-xs text-good">{note}</span> : null}
+        </div>
+        {err ? <InlineError error={err} /> : null}
+      </div>
+    </Card>
+  );
+}
+

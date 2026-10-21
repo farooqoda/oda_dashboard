@@ -3,6 +3,8 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../data/AuthProvider';
 import { useExtensionTask } from '../lib/extensionBridge';
 import { firstNameOf, initialsOf } from '../lib/person';
+import { useIsManager } from '../lib/team';
+import { Bell } from './Today';
 
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
@@ -93,6 +95,8 @@ export function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setMenuOpen(false), [location.pathname]);
+  const manager = useIsManager();
+  const nav = manager ? [...NAV, { to: '/team', label: 'Team', end: false }] : NAV;
 
   const pill = ({ isActive }: { isActive: boolean }) =>
     `whitespace-nowrap rounded-full px-3.5 py-2 text-sm transition-colors ${
@@ -110,7 +114,7 @@ export function TopBar() {
         </Link>
 
         <nav aria-label="Main" className="mx-auto hidden rounded-full bg-white/60 p-1 xl:flex">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={pill}>
               {item.label}
             </NavLink>
@@ -119,6 +123,7 @@ export function TopBar() {
 
         <div className="ml-auto flex items-center gap-2 xl:ml-0">
           <ExtensionPill />
+          <Bell />
           <button
             type="button"
             className="inline-flex h-11 items-center rounded-full bg-white/70 px-4 text-sm font-medium text-slate-800 xl:hidden"
@@ -133,7 +138,7 @@ export function TopBar() {
 
       {menuOpen ? (
         <nav aria-label="Main" className="mt-3 grid grid-cols-2 gap-1 rounded-3xl bg-white/80 p-2 sm:grid-cols-3 xl:hidden">
-          {[...NAV, { to: '/settings', label: 'Settings', end: false }].map((item) => (
+          {[...nav, { to: '/settings', label: 'Settings', end: false }].map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={pill}>
               {item.label}
             </NavLink>
