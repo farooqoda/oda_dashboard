@@ -82,7 +82,7 @@ export async function sendTestDigest(userId: string): Promise<FriendlyError | nu
     }
     if (res.ok && r && r.ok === true && Number(r.sent) > 0) return null;
     if (r && r.reason === 'email_failed') {
-      return { message: 'The email could not be sent.', hint: `Check the SMTP account in n8n. Details: ${String(r.detail ?? '').slice(0, 200)}`, code: 'DIGEST' };
+      return { message: 'The email could not be sent.', hint: `Check the Resend API key in n8n and that the sender domain is verified in Resend. Details: ${String(r.detail ?? '').slice(0, 200)}`, code: 'DIGEST' };
     }
     if (r && r.reason === 'no_email') {
       return { message: 'No email was sent.', hint: 'Your licence is not active, or your account has no email address.', code: 'DIGEST' };
