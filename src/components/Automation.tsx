@@ -364,6 +364,7 @@ export function MorningEmailCard() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<FriendlyError | null>(null);
+  const [errTitle, setErrTitle] = useState<string | undefined>(undefined);
   if (loading || missing || !settings) return null;
   if (!settings.batch_c) {
     return (
@@ -381,7 +382,10 @@ export function MorningEmailCard() {
     setNote(null);
     const e = await save({ digest_on: curOn, digest_hour: curHour });
     setBusy(false);
-    if (e) setErr(e);
+    if (e) {
+      setErr(e);
+      setErrTitle(undefined);
+    }
     else {
       setOn(null);
       setHour(null);
@@ -395,7 +399,10 @@ export function MorningEmailCard() {
     setNote(null);
     const e = await sendTestDigest(user.id);
     setBusy(false);
-    if (e) setErr(e);
+    if (e) {
+      setErr(e);
+      setErrTitle('The test email was not sent.');
+    }
     else setNote(`Test email sent to ${user.email ?? 'you'}. Check your inbox (and spam).`);
   };
   const fmt = (h: number) => `${((h + 11) % 12) + 1}:00 ${h < 12 ? 'AM' : 'PM'}`;
@@ -426,7 +433,7 @@ export function MorningEmailCard() {
           </button>
           {note ? <span className="text-xs text-good">{note}</span> : null}
         </div>
-        {err ? <InlineError error={err} /> : null}
+        {err ? <InlineError error={err} title={errTitle} /> : null}
       </div>
     </Card>
   );
