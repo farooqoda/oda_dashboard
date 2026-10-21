@@ -13,7 +13,9 @@ import {
   TypePill,
 } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
-import { InboxCheckLine, SafetyBanner } from '../components/Automation';
+import { InboxCheckLine, SafetyBanner, useAutomation } from '../components/Automation';
+import { FollowupList } from '../components/FollowupsPanel';
+import { draftNow, isFirstMessage, isFollowupItem, isReplyItem } from '../lib/followups';
 import { useLeads } from '../data/LeadsProvider';
 import { CHAT_CHAR_LIMIT, DEFAULT_STAGE } from '../lib/constants';
 import { useInviteLimit } from '../lib/prompts';
@@ -35,7 +37,7 @@ import { personalityType } from '../lib/traitsRegistry';
 import type { FriendlyError } from '../lib/supabase';
 import type { Lead, SendStatus } from '../lib/types';
 
-type TabKey = 'send' | 'queue' | 'sent' | 'failed' | 'skipped';
+type TabKey = 'send' | 'queue' | 'sent' | 'failed' | 'skipped' | 'followups' | 'replies';
 
 const sendStatusOf = (lead: Lead): SendStatus => (lead.send_status ?? 'none') as SendStatus;
 
@@ -45,10 +47,13 @@ const TABS: Array<{ key: TabKey; label: string; match: (l: Lead) => boolean }> =
     label: 'To send',
     match: (l) => sendStatusOf(l) === 'none' && !!l.invite_message?.trim() && stageOf(l) === DEFAULT_STAGE,
   },
-  { key: 'queue', label: 'Queued', match: (l) => ['queued', 'sending'].includes(sendStatusOf(l)) },
+  { key: 'queue', label: 'Queued', match: (l) => ['queued', 'sending'].includes(sendStatusOf(l)) && isFirstMessage(l) },
   { key: 'sent', label: 'Sent', match: (l) => sendStatusOf(l) === 'sent' },
   { key: 'failed', label: 'Failed', match: (l) => sendStatusOf(l) === 'failed' },
   { key: 'skipped', label: 'Skipped', match: (l) => sendStatusOf(l) === 'skipped' },
+  // Batch B: AI follow-ups and reply drafts, waiting for your approval
+  { key: 'followups', label: 'Follow-ups', match: isFollowupItem },
+  { key: 'replies', label: 'Replies', match: isReplyItem },
 ];
 
 const DEFAULT_CHAT_HINT =
@@ -348,8 +353,13 @@ export function OutreachPage() {
   const userId = user?.id ?? null;
   const inviteLimit = useInviteLimit(userId);
   const extension = useExtensionTask();
+  const automation = useAutomation();
+  const followupTotal = automation.settings?.followup_days.length || 2;
+  const [drafting, setDrafting] = useState(false);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
 
   const [tab, setTab] = useState<TabKey>('send');
+  const followupTab = tab === 'followups' || tab === 'replies';
   const [openId, setOpenId] = useState<number | null>(null);
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [chats, setChats] = useState<Record<number, string>>({});
@@ -554,6 +564,23 @@ export function OutreachPage() {
     refresh();
   };
 
+  const writeDraftsNow = async () => {
+    if (!userId) return;
+    setDrafting(true);
+    setActionError(null);
+    setDraftNotice(null);
+    const res = await draftNow(userId);
+    setDrafting(false);
+    if (res.error) return setActionError(res.error);
+    const { followups, replies, failed } = res.data;
+    setDraftNotice(
+      followups + replies === 0 && failed === 0
+        ? 'Nothing is due right now.'
+        : `Written: ${followups} follow-up${followups === 1 ? '' : 's'}, ${replies} repl${replies === 1 ? 'y' : 'ies'}${failed ? ` (${failed} failed, see below)` : ''}.`,
+    );
+    refresh();
+  };
+
   const onAction = async (l: Lead, action: RowAction) => {
     if (action === 'details') return setOpenId(l.id);
     if (action === 'send') return send([l]);
@@ -674,6 +701,23 @@ export function OutreachPage() {
         ))}
       </div>
 
+      {followupTab && userId ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-4 py-3 text-xs text-slate-600">
+          <span>
+            {tab === 'followups'
+              ? automation.settings?.followup_mode === 'auto'
+                ? 'Follow-ups are sent automatically (Settings). They are written when due and go straight to the queue.'
+                : `Follow-ups wait for your approval (change in Settings). Due after ${(automation.settings?.followup_days ?? [4, 7]).join(' and ')} days, only to people who have not written back.`
+              : 'Replies always wait for your approval. The extension checks your LinkedIn inbox every 3 hours; new replies get an AI draft within 10 minutes.'}{' '}
+            Approved messages are sent by the extension in your existing LinkedIn conversation (task: Message Studio).
+            {draftNotice ? <b className="ml-1 text-slate-800">{draftNotice}</b> : null}
+          </span>
+          <button type="button" className="btn-secondary" disabled={drafting} onClick={() => void writeDraftsNow()}>
+            {drafting ? 'Writing…' : '✨ Write due drafts now'}
+          </button>
+        </div>
+      ) : null}
+
       {showCheckboxes && selectableInView.length > 0 ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -708,6 +752,17 @@ export function OutreachPage() {
 
       {loading ? (
         <SkeletonCards count={4} />
+      ) : followupTab && userId ? (
+        <div className={refreshing ? 'is-refreshing' : ''}>
+          <FollowupList
+            kind={tab === 'followups' ? 'followup' : 'reply'}
+            leads={visible}
+            userId={userId}
+            followupTotal={followupTotal}
+            onChanged={refresh}
+            onOpen={setOpenId}
+          />
+        </div>
       ) : visible.length === 0 ? (
         <EmptyState title={tab === 'send' ? 'Nothing waiting to be sent' : 'No leads in this list'}>
           {tab === 'send'

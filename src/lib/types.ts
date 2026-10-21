@@ -53,7 +53,22 @@ export interface Lead {
   reply_detected_at?: string | null;
   reply_snippet?: string | null;
   connected_detected_at?: string | null;
+  /** Batch B (extension v4.25): AI follow-ups and reply drafts. */
+  followup_step?: number | null;
+  followup_status?: FollowupStatus | null;
+  followup_draft?: string | null;
+  followup_error?: string | null;
+  followup_drafted_at?: string | null;
+  followup_last_sent_at?: string | null;
+  reply_draft_status?: ReplyDraftStatus | null;
+  reply_drafted_at?: string | null;
+  reply_sent_at?: string | null;
+  /** What the send queue is sending: null = the first message. */
+  send_kind?: 'followup' | 'reply' | null;
 }
+
+export type FollowupStatus = 'none' | 'drafting' | 'drafted' | 'queued' | 'sent' | 'failed' | 'stopped' | 'redraft';
+export type ReplyDraftStatus = 'none' | 'drafting' | 'drafted' | 'queued' | 'sent' | 'failed' | 'redraft';
 
 export type ChatStatus = 'none' | 'draft_requested' | 'drafting' | 'drafted';
 export type SendStatus = 'none' | 'queued' | 'sending' | 'sent' | 'failed' | 'skipped';

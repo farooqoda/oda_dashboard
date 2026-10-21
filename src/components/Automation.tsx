@@ -156,7 +156,11 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
   };
   const toggleDay = (d: number) =>
     set({ work_days: draft.work_days.includes(d) ? draft.work_days.filter((x) => x !== d) : [...draft.work_days, d].sort() });
-  const invalid = draft.work_days.length === 0 || draft.work_start === draft.work_end;
+  const daysBad = draft.followup_days.length < 1 || draft.followup_days.some((d) => !Number.isInteger(d) || d < 1 || d > 30);
+  const invalid = draft.work_days.length === 0 || draft.work_start === draft.work_end || daysBad;
+  const setDay = (i: number, v: number) => set({ followup_days: draft.followup_days.map((d, j) => (j === i ? v : d)) });
+  const setCount = (n: number) =>
+    set({ followup_days: Array.from({ length: n }, (_, i) => draft.followup_days[i] ?? (i === 0 ? 4 : 7)) });
 
   const onSave = async () => {
     setSaving(true);
@@ -168,6 +172,8 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
       work_end: draft.work_end,
       work_tz: draft.work_tz,
       warmup_on: draft.warmup_on,
+      followup_mode: draft.followup_mode,
+      followup_days: draft.followup_days,
     });
     setSaving(false);
     if (err) setSaveErr(err);
@@ -250,6 +256,61 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
               </>
             ) : null}
           </p>
+        </section>
+
+        <section aria-labelledby="fu-h" className="border-t border-slate-100 pt-5">
+          <p className="text-sm font-medium text-slate-900" id="fu-h">
+            Follow-ups
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            When someone has not written back, the AI writes a short follow-up. It never goes to people who replied, and for
+            connection requests only after they accept. Replies to people who wrote back always wait for your approval.
+          </p>
+          <div className="mt-3 space-y-2 text-sm" role="radiogroup" aria-label="Follow-up sending">
+            <label className="flex items-start gap-2">
+              <input type="radio" name="fu-mode" className="mt-1" checked={draft.followup_mode === 'approve'} onChange={() => set({ followup_mode: 'approve' })} />
+              <span>
+                <b>I approve each one</b> — follow-ups wait in Message Studio → Follow-ups.
+              </span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="radio" name="fu-mode" className="mt-1" checked={draft.followup_mode === 'auto'} onChange={() => set({ followup_mode: 'auto' })} />
+              <span>
+                <b>Send automatically</b> — they go straight into the send queue (the extension still respects your working hours and limits).
+              </span>
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <label className="flex items-center gap-1.5">
+              Follow-ups
+              <select className="input w-16 py-1" value={draft.followup_days.length} onChange={(e) => setCount(Number(e.target.value))}>
+                {[1, 2, 3].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {draft.followup_days.map((d, i) => (
+              <label key={i} className="flex items-center gap-1.5">
+                {i === 0 ? '· 1st after' : `· ${i === 1 ? '2nd' : '3rd'} after`}
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  className="input w-16 py-1"
+                  value={Number.isFinite(d) ? d : ''}
+                  onChange={(e) => setDay(i, Math.round(Number(e.target.value)))}
+                  aria-label={`Days before follow-up ${i + 1}`}
+                />
+                days
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            The 1st counts from your first message; after a connection request, a short “thanks for connecting” goes as soon as they accept. Each next one counts from the follow-up before it.
+          </p>
+          {daysBad ? <p className="text-xs text-red-700">Each wait must be 1 to 30 days.</p> : null}
         </section>
 
         <section className="border-t border-slate-100 pt-5">
