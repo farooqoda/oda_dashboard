@@ -81,6 +81,13 @@ export async function sendTestDigest(userId: string): Promise<FriendlyError | nu
       r = null;
     }
     if (res.ok && r && r.ok === true && Number(r.sent) > 0) return null;
+    if (r && r.reason === 'email_failed' && /not authorized to send emails from/i.test(String(r.detail ?? ''))) {
+      return {
+        message: 'Your Resend API key may not send from this domain.',
+        hint: 'In Resend, create a key with "Sending access" for All domains (or for the sender\'s domain) and put it in the "Resend API" credential in n8n. Details: ' + String(r.detail ?? '').slice(0, 200),
+        code: 'DIGEST',
+      };
+    }
     if (r && r.reason === 'email_failed') {
       return { message: 'The email could not be sent.', hint: `Check the Resend API key in n8n and that the sender domain is verified in Resend. Details: ${String(r.detail ?? '').slice(0, 200)}`, code: 'DIGEST' };
     }
