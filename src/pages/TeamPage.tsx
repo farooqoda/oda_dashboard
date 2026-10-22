@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChartCard, ColumnChart } from '../components/charts';
+import { MemberLimitsCard } from '../components/Limits';
 import { EmptyState, ErrorState, PageHeader, SkeletonCards } from '../components/ui';
 import { formatDateTime } from '../lib/format';
 import { guessTimeZone } from '../lib/automation';
@@ -368,6 +369,7 @@ export function TeamPage() {
               </section>
             );
           })}
+          <MemberLimitsCard client={client} />
           <p className="text-xs text-slate-500">
             Counts are people, not messages (someone who got two follow-ups counts once). “Status now”, failed, queued and “to approve”
             are right now; everything else is for the dates chosen. Time saved assumes by hand: 3 min a profile, 2 an invite, 3 a
