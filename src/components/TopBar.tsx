@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../data/AuthProvider';
 import { useExtensionTask } from '../lib/extensionBridge';
-import { firstNameOf, initialsOf } from '../lib/person';
+import { firstNameOf, fullNameOf, userInitials } from '../lib/person';
 import { useIsManager } from '../lib/team';
 import { Bell } from './Today';
 import { ThemeChooser, ThemeToggle } from './ThemeToggle';
@@ -55,24 +55,27 @@ function AccountMenu() {
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
 
-  const name = firstNameOf(user);
+  const full = fullNameOf(user) || firstNameOf(user);
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Account menu"
+        aria-label={full ? `Account menu (${full})` : 'Account menu'}
         aria-expanded={open}
         className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white"
       >
-        {initialsOf(name || user?.email)}
+        {userInitials(user)}
       </button>
       {open ? (
         <div className="absolute right-0 z-40 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
           {user?.email ? (
-            <p className="truncate px-3 py-2 text-xs text-slate-500" title={user.email}>
-              {user.email}
-            </p>
+            <div className="px-3 py-2">
+              {full ? <p className="truncate text-sm font-medium text-slate-900">{full}</p> : null}
+              <p className="truncate text-xs text-slate-500" title={user.email}>
+                {user.email}
+              </p>
+            </div>
           ) : null}
           <div className="px-3 py-2">
             <p className="mb-1 text-xs text-slate-500">Theme</p>

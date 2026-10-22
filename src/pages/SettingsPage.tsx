@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AutomationCard, MorningEmailCard } from '../components/Automation';
 import { Card, CopyButton, PageHeader } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
+import { fullNameOf } from '../lib/person';
 import { useLeads } from '../data/LeadsProvider';
 import { fetchAccountRecord, updatePassword, validateNewPassword, type AccountRecord } from '../lib/auth';
 import { MAX_ROWS, SUPPORT_EMAIL } from '../lib/constants';
@@ -295,6 +296,51 @@ function ChangePasswordSection() {
   );
 }
 
+// Your name: shown on the account button (initials) and in greetings. Saved on the sign-in account.
+function NameRow() {
+  const { user } = useAuth();
+  const [value, setValue] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const current = fullNameOf(user);
+  const v = value ?? current;
+  const save = async () => {
+    if (!supabase) return;
+    setBusy(true);
+    setMsg(null);
+    const { error } = await supabase.auth.updateUser({ data: { full_name: v.trim() } });
+    setBusy(false);
+    if (error) setMsg('Not saved: ' + error.message);
+    else {
+      setValue(null);
+      setMsg('Saved.');
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 border-b border-slate-100 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <label htmlFor="your-name" className="text-sm text-slate-600">
+        Your name
+      </label>
+      <span className="flex items-center gap-2">
+        <input
+          id="your-name"
+          className="input w-56 py-1.5"
+          value={v}
+          placeholder="First and last name"
+          onChange={(e) => {
+            setValue(e.target.value);
+            setMsg(null);
+          }}
+        />
+        <button type="button" className="btn-secondary" disabled={busy || !v.trim() || v.trim() === current} onClick={() => void save()}>
+          {busy ? 'Saving…' : 'Save name'}
+        </button>
+        {msg ? <span className={`text-xs ${msg === 'Saved.' ? 'text-good' : 'text-critical'}`}>{msg}</span> : null}
+      </span>
+    </div>
+  );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
@@ -329,6 +375,7 @@ export function SettingsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Your account">
           <div className="divide-y divide-slate-100">
+            <NameRow />
             <Row label="Signed in as" value={user?.email ?? 'Not signed in'} />
             <Row
               label="Email on your account"
