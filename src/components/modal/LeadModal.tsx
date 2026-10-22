@@ -177,7 +177,12 @@ export function LeadModal({ leadId, onClose }: { leadId: number | null; onClose:
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
-        {tab === 'Profile' ? <ProfileTab lead={lead} /> : null}
+        {tab === 'Profile' ? (
+          // LinkedIn's own look: stays light in the dark theme
+          <div className="keep-light rounded-xl text-slate-900">
+            <ProfileTab lead={lead} />
+          </div>
+        ) : null}
         {tab === 'Psychographics' ? <PsychographicsTab lead={lead} /> : null}
         {tab === 'Outreach' ? (
           <OutreachTab lead={lead} saving={saving} onPatch={(p) => void patch(p)} />
@@ -201,7 +206,7 @@ function Shell({
 }) {
   void closeRef;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-0 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-0 sm:p-6">
       <div
         aria-hidden="true"
         className="absolute inset-0"

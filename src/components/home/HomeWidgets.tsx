@@ -80,7 +80,7 @@ export function SuggestedCard({ lead, onOpen }: { lead: Lead | null; onOpen: (id
   const name = displayName(lead);
   const score = fitScore(lead.traits);
   return (
-    <div className="relative flex min-h-[300px] flex-col overflow-hidden rounded-tile bg-gradient-to-b from-[#dcdad4] via-[#c9c6bf] to-[#8d8a84]">
+    <div className="keep-light relative flex min-h-[300px] flex-col overflow-hidden rounded-tile bg-gradient-to-b from-[#dcdad4] via-[#c9c6bf] to-[#8d8a84]">
       <div className="flex flex-1 items-center justify-center pt-6">
         <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white/40 text-4xl font-light tracking-tight text-ink">
           {initialsOf(name)}

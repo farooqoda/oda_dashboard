@@ -5,6 +5,7 @@ import { useExtensionTask } from '../lib/extensionBridge';
 import { firstNameOf, initialsOf } from '../lib/person';
 import { useIsManager } from '../lib/team';
 import { Bell } from './Today';
+import { ThemeChooser, ThemeToggle } from './ThemeToggle';
 
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
@@ -26,11 +27,13 @@ function ExtensionPill() {
     <button
       type="button"
       onClick={status === 'missing' ? recheck : undefined}
-      title={status === 'missing' ? 'Check again' : undefined}
+      title={status === 'missing' ? 'Extension not detected — click to check again' : text}
       className="hidden items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-sm text-slate-800 sm:inline-flex"
     >
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
-      {text}
+      {/* short form on narrower screens so the bar fits on one line */}
+      <span className="whitespace-nowrap 2xl:hidden">{status === 'connected' ? 'Connected' : status === 'missing' ? 'Not detected' : 'Checking…'}</span>
+      <span className="hidden whitespace-nowrap 2xl:inline">{text}</span>
     </button>
   );
 }
@@ -71,6 +74,10 @@ function AccountMenu() {
               {user.email}
             </p>
           ) : null}
+          <div className="px-3 py-2">
+            <p className="mb-1 text-xs text-slate-500">Theme</p>
+            <ThemeChooser />
+          </div>
           <Link to="/settings" className="block rounded-xl px-3 py-2 text-sm text-slate-800 hover:bg-slate-100">
             Settings
           </Link>
@@ -123,6 +130,7 @@ export function TopBar() {
 
         <div className="ml-auto flex items-center gap-2 xl:ml-0">
           <ExtensionPill />
+          <ThemeToggle />
           <Bell />
           <button
             type="button"

@@ -4,6 +4,10 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import '@fontsource-variable/urbanist/index.css';
 import './index.css';
+import { applyTheme, watchSystemTheme } from './lib/theme';
+
+applyTheme();
+watchSystemTheme();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

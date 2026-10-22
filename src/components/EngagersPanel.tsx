@@ -165,7 +165,7 @@ export function EngagersPanel({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-0 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-0 sm:p-6">
       <div aria-hidden="true" className="absolute inset-0" onClick={onClose} />
       <div
         role="dialog"
