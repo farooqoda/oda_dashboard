@@ -6,6 +6,18 @@
     <meta name="color-scheme" content="light" />
     <title>Impact Connect · Impact Innovation Hub</title>
     <script>
+      // Theme before the page paints (no white flash in dark mode). Same rules as src/lib/theme.ts.
+      (function(){
+        var c = 'system';
+        try { c = localStorage.getItem('ic-theme') || 'system'; } catch (e) {}
+        var dark = c === 'dark' || (c !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) {
+          document.documentElement.classList.add('dark');
+          var m = document.querySelector('meta[name="color-scheme"]'); if (m) m.setAttribute('content', 'dark');
+        }
+      })();
+    </script>
+    <script>
       (function(){
         var redirect = sessionStorage.redirect;
         delete sessionStorage.redirect;
