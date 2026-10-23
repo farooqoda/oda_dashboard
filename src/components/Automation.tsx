@@ -202,7 +202,24 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
       description="Applies to runs the extension starts by itself (⚡). Runs you start by hand always run."
     >
       <div className="space-y-6">
-        <section aria-labelledby="hours-h">
+        <section>
+          <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-900">
+            Your time zone
+            <select className="input w-auto max-w-[16rem] py-1 font-normal" aria-label="Time zone" value={draft.work_tz} onChange={(e) => set({ work_tz: e.target.value })}>
+              {(zones.includes(draft.work_tz) ? zones : [draft.work_tz, ...zones]).map((z) => (
+                <option key={z} value={z}>
+                  {z}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-1 text-xs text-slate-500">
+            Used everywhere: your working hours, when a new day starts for your invite limit (midnight, your time), the morning email,
+            and the times of your scheduled posts.
+          </p>
+        </section>
+
+        <section aria-labelledby="hours-h" className="border-t border-slate-100 pt-5">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-900" id="hours-h">
             <input type="checkbox" checked={draft.schedule_on} onChange={(e) => set({ schedule_on: e.target.checked })} />
             Only work in my working hours
@@ -237,18 +254,7 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
                 to
                 <input type="time" className="input w-28 py-1" value={draft.work_end} onChange={(e) => set({ work_end: e.target.value })} />
               </label>
-              <label className="flex min-w-0 items-center gap-1.5">
-                Time zone
-                <select className="input max-w-[14rem] py-1" value={draft.work_tz} onChange={(e) => set({ work_tz: e.target.value })}>
-                  {(zones.includes(draft.work_tz) ? zones : [draft.work_tz, ...zones]).map((z) => (
-                    <option key={z} value={z}>
-                      {z}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
-            <p className="text-xs text-slate-500">Your time zone also decides when a new day starts for your invite limit (midnight, your time).</p>
             {draft.work_days.length === 0 ? <p className="text-xs text-red-700">Pick at least one day.</p> : null}
             {draft.work_start === draft.work_end ? <p className="text-xs text-red-700">Start and end must differ.</p> : null}
           </fieldset>

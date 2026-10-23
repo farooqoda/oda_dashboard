@@ -1,3 +1,4 @@
+import { Translation } from './Languages';
 import { useState } from 'react';
 import { Avatar, EmptyState, InlineError, StagePill } from './ui';
 import { CHAT_CHAR_LIMIT } from '../lib/constants';
@@ -174,6 +175,7 @@ function DraftRow({
                 onBlur={() => void saveText()}
               />
             )}
+            <Translation text={writing && !saved ? '' : value} />
             {ready ? (
               <p className={`mt-1 text-right text-[11px] tabular-nums ${over ? 'font-medium text-red-700' : 'text-slate-400'}`}>
                 {value.length}/{CHAT_CHAR_LIMIT}
