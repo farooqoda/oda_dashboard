@@ -1,3 +1,4 @@
+import { COMMENT_LANGUAGES } from './comments';
 import { POST_WRITER_WEBHOOK, PUBLISH_NOW_WEBHOOK } from './constants';
 import { supabase, supabaseConfigError, toFriendlyError, type FriendlyError } from './supabase';
 
@@ -27,7 +28,8 @@ export interface LinkedInConnection {
 
 export const MAX_POST = 3000;
 /** Languages the AI writer offers on the Publish page ('auto' = the topic's language). */
-export const POST_LANGUAGES = ['English', 'Urdu', 'Roman Urdu', 'Arabic', 'Hindi', 'Punjabi', 'French', 'Spanish', 'German', 'Turkish'];
+// the same list as Comments, plus Roman Urdu (Urdu in English letters)
+export const POST_LANGUAGES = COMMENT_LANGUAGES.filter((l) => l.value !== 'auto').flatMap((l) => (l.value === 'Urdu' ? ['Urdu', 'Roman Urdu'] : [l.value]));
 const LANG_KEY = 'gab_publish_language';
 export function savedPostLanguage(): string {
   try {
