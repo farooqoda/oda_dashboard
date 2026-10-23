@@ -185,8 +185,9 @@ export function BulkLeadsPage() {
       <section className="card mb-6 p-5">
         <ol className="grid gap-4 md:grid-cols-3">
           <Step n={1} title="Collect from a LinkedIn search">
-            On LinkedIn, search for people (filters like location, industry or connection degree work too). The extension panel at the bottom
-            right shows “📋 Collect people from this search” — choose how many pages.
+            On LinkedIn, search and open the <b>People</b> or the <b>Services</b> results (people who offer a service). Filters like location,
+            industry or connection degree work too. The extension panel at the bottom right shows “📋 Collect people from this search” — choose
+            how many pages.
           </Step>
           <Step n={2} title="Pick who to sync">
             They land here under Waiting. Select the people you want and press “Sync selected”. People already on your Find People page are
@@ -319,7 +320,7 @@ export function BulkLeadsPage() {
         <SkeletonTable />
       ) : rows.length === 0 ? (
         <EmptyState title="Nobody collected yet">
-          Open LinkedIn with the Find People task, search for people, and press “📋 Collect people from this search” in the extension panel.
+          Open LinkedIn with the Find People task, open the People or Services results of a search, and press “📋 Collect people from this search” in the extension panel.
           They will appear here.
         </EmptyState>
       ) : visible.length === 0 ? (
