@@ -11,12 +11,14 @@ import {
   deletePost,
   disconnectLinkedIn,
   formatInZone,
+  loadPostAbout,
   loadPosts,
   loadPublishState,
   publishNow,
   rememberPostLanguage,
   retryPost,
   savePost,
+  savePostAbout,
   savedPostLanguage,
   startLinkedInConnect,
   utcToZoned,
@@ -156,6 +158,64 @@ function ConnectionCard({
 // ---------------------------------------------------------------------------
 // Write + schedule
 // ---------------------------------------------------------------------------
+function AboutYou() {
+  const { user, clientId } = useAuth();
+  const [saved, setSaved] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState<FriendlyError | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    void loadPostAbout(user.id).then((v) => {
+      setSaved(v);
+      setText(v ?? '');
+      if (v === '') setOpen(true); // first visit: show it
+    });
+  }, [user]);
+  if (saved === null) return null;
+  const save = async () => {
+    if (!user) return;
+    setBusy(true);
+    setErr(null);
+    const e = await savePostAbout(user.id, clientId, text);
+    setBusy(false);
+    if (e) return setErr(e);
+    setSaved(text.trim());
+    setMsg('Saved. The AI uses this in every post.');
+  };
+  return (
+    <div className="mb-3">
+      <button type="button" className="text-xs font-medium text-brand-700 underline underline-offset-2" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {open ? '▾' : '▸'} About you {saved ? '(saved)' : '— tell the AI who you are'}
+      </button>
+      {open ? (
+        <div className="mt-2">
+          <textarea
+            className="input min-h-[80px] w-full"
+            aria-label="About you"
+            maxLength={3000}
+            placeholder="e.g. I'm an AI automation engineer and n8n workflow specialist in Toronto. I build lead-generation and follow-up systems for small businesses. I write in a friendly, no-jargon way."
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setMsg('');
+            }}
+          />
+          <div className="mt-1 flex items-center gap-3">
+            <button type="button" className="btn-secondary py-1 text-xs" onClick={() => void save()} disabled={busy || text.trim() === (saved ?? '')}>
+              {busy ? 'Saving…' : 'Save about me'}
+            </button>
+            <span className="text-xs text-slate-500">{msg || 'Your work, who you help, a few real results — the AI only uses what you write here.'}</span>
+          </div>
+          {err ? <InlineError error={err} title="Not saved" /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function defaultSlot(tz: string) {
   const t = utcToZoned(new Date(Date.now() + DAY), tz);
   return { date: t.date, time: '09:00' };
@@ -235,6 +295,7 @@ function Composer({
   return (
     <Card title={editing ? 'Edit post' : 'Write a post'} description="Write it yourself or let the AI draft it, then pick the day and time.">
       <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <AboutYou />
         <label className="block text-xs font-medium text-slate-600" htmlFor="pub-topic">
           ✨ What should the post be about?
         </label>
@@ -284,7 +345,7 @@ function Composer({
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             {drafts.map((d, i) => (
               <div key={i} className="flex flex-col rounded-lg border border-slate-200 bg-white p-3">
-                <p className="mb-2 line-clamp-[10] whitespace-pre-line text-xs text-slate-700">{d}</p>
+                <p className="mb-2 max-h-72 overflow-y-auto whitespace-pre-line text-xs leading-relaxed text-slate-700">{d}</p>
                 <button
                   type="button"
                   className="btn-secondary mt-auto py-1 text-xs"

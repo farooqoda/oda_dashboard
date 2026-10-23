@@ -181,3 +181,24 @@ export function utcToZoned(iso: string | Date, tz: string): { date: string; time
 export function formatInZone(iso: string, tz: string): string {
   return new Intl.DateTimeFormat(undefined, { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
 }
+
+// ---------------------------------------------------------------------------
+// "About you": what the AI should know about the member for every post
+// ---------------------------------------------------------------------------
+export async function loadPostAbout(userId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('gab_comment_settings').select('post_about').eq('user_id', userId).maybeSingle();
+  if (error) return null; // column not there yet: the box stays hidden
+  return ((data as { post_about?: string | null } | null)?.post_about ?? '') || '';
+}
+/** Insert-or-update by hand (members may not update user_id, so no upsert). */
+export async function savePostAbout(userId: string, clientId: string | null, text: string): Promise<FriendlyError | null> {
+  if (!supabase) return cfgErr();
+  const { data: existing, error: readError } = await supabase.from('gab_comment_settings').select('user_id').eq('user_id', userId).maybeSingle();
+  if (readError) return toFriendlyError(readError);
+  const fields = { post_about: text.trim() || null };
+  const { error } = existing
+    ? await supabase.from('gab_comment_settings').update(fields).eq('user_id', userId)
+    : await supabase.from('gab_comment_settings').insert({ user_id: userId, client_id: clientId, ...fields });
+  return error ? toFriendlyError(error) : null;
+}
