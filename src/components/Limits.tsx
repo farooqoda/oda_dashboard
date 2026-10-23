@@ -208,7 +208,7 @@ export function MyLimitsCard() {
         </div>
       </div>
       <p className="mt-3 text-xs text-slate-500">
-        Your day follows the time zone under “Working hours” below. Need a different limit? Ask your manager.
+        Your day follows “Your time zone” below. Need a different limit? Ask your manager.
       </p>
     </Card>
   );

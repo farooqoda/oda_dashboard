@@ -1,9 +1,10 @@
+import { LanguagePickers, Translation } from '../components/Languages';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAutomation } from '../components/Automation';
 import { Card, EmptyState, ErrorState, InlineError, PageHeader, SkeletonCards } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
-import { guessTimeZone } from '../lib/automation';
+import { guessTimeZone, timeZones } from '../lib/automation';
 import {
   MAX_POST,
   POST_LANGUAGES,
@@ -223,15 +224,19 @@ function defaultSlot(tz: string) {
 
 function Composer({
   tz,
+  onTz,
   connected,
   editing,
   onDone,
 }: {
   tz: string;
+  onTz: (tz: string) => Promise<FriendlyError | null>;
   connected: boolean;
   editing: ScheduledPost | null;
   onDone: (msg: string) => void;
 }) {
+  const zones = useMemo(() => timeZones(), []);
+  const [tzErr, setTzErr] = useState<FriendlyError | null>(null);
   const { user } = useAuth();
   const [body, setBody] = useState('');
   const [slot, setSlot] = useState(() => defaultSlot(tz));
@@ -341,11 +346,15 @@ function Composer({
             </button>
           ) : null}
         </div>
+        <LanguagePickers show="translate" className="mt-3" />
         {drafts.length ? (
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             {drafts.map((d, i) => (
               <div key={i} className="flex flex-col rounded-lg border border-slate-200 bg-white p-3">
                 <p className="mb-2 max-h-72 overflow-y-auto whitespace-pre-line text-xs leading-relaxed text-slate-700">{d}</p>
+                <div className="mb-2 max-h-48 overflow-y-auto">
+                  <Translation text={d} lang={language === 'auto' ? null : language} />
+                </div>
                 <button
                   type="button"
                   className="btn-secondary mt-auto py-1 text-xs"
@@ -373,6 +382,7 @@ function Composer({
         onChange={(e) => setBody(e.target.value)}
         placeholder="Your post. The first two lines show before “…see more”, so make them count."
       />
+      <Translation text={body} />
       <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs">
         <span className={tooLong ? 'font-medium text-red-700' : 'text-slate-500'}>
           {body.length.toLocaleString()} / {MAX_POST.toLocaleString()}
@@ -389,8 +399,27 @@ function Composer({
           <span className="text-xs text-slate-500">Time</span>
           <input type="time" className="input w-auto py-1.5" value={slot.time} onChange={(e) => setSlot((s) => ({ ...s, time: e.target.value }))} />
         </label>
-        <span className="pb-2 text-xs text-slate-500">your time ({tz.replace(/_/g, ' ')})</span>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500">Your time zone</span>
+          <select
+            className="input w-auto max-w-[16rem] py-1.5"
+            aria-label="Your time zone"
+            value={tz}
+            onChange={(e) => {
+              setTzErr(null);
+              void onTz(e.target.value).then(setTzErr);
+            }}
+          >
+            {(zones.includes(tz) ? zones : [tz, ...zones]).map((z) => (
+              <option key={z} value={z}>
+                {z}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+      <p className="mt-1 text-xs text-slate-500">The day and time are in this time zone. It is the same setting as in Settings (working hours, invite day, morning email).</p>
+      {tzErr ? <InlineError error={tzErr} title="Time zone not saved" /> : null}
       {past ? <p className="mt-1 text-xs text-red-700">That time has passed. Pick a later time, or use “Post now”.</p> : null}
       <p className="mt-1 text-xs text-slate-500">Weekday mornings (8–10 am) and lunchtime usually get the most views.</p>
 
@@ -537,7 +566,7 @@ function PostList({
 // Page
 // ---------------------------------------------------------------------------
 export function PublishPage() {
-  const { settings } = useAutomation();
+  const { settings, save } = useAutomation();
   const tz = settings?.work_tz || guessTimeZone();
   const [state, setState] = useState<{ ready: boolean; connection: LinkedInConnection | null } | null>(null);
   const [posts, setPosts] = useState<ScheduledPost[] | null>(null);
@@ -587,6 +616,7 @@ export function PublishPage() {
           ) : null}
           <Composer
             tz={tz}
+            onTz={(z) => save({ work_tz: z })}
             connected={connected}
             editing={editing}
             onDone={(msg) => {

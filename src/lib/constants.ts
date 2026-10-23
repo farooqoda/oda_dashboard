@@ -127,3 +127,5 @@ export const MIN_PASSWORD_LENGTH = 8;
 export const POST_WRITER_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/post-writer';
 /** Batch E: post everything that is due now (it also runs every 5 minutes). */
 export const PUBLISH_NOW_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/linkedin-publish';
+/** Batch E2: translations into the member's own language (cached in the database). `{ user_id, target, texts[] }` → `{ ok, translations[] }`. */
+export const TRANSLATE_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/translate';

@@ -20,6 +20,7 @@ import { draftNow, isFirstMessage, isFollowupItem, isReplyItem } from '../lib/fo
 import { useLeads } from '../data/LeadsProvider';
 import { CHAT_CHAR_LIMIT, DEFAULT_STAGE } from '../lib/constants';
 import { useInviteLimit } from '../lib/prompts';
+import { LanguagePickers, Translation } from '../components/Languages';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useExtensionTask } from '../lib/extensionBridge';
 import { displayName, formatDate, formatDateTime, stageOf } from '../lib/format';
@@ -277,6 +278,7 @@ function LeadRow({
             ) : (
               <p className="whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{note}</p>
             )}
+            <Translation text={inviteBusy ? '' : note} />
             <p className={`mt-1 text-right text-[11px] tabular-nums ${noteOver ? 'font-medium text-red-700' : 'text-slate-400'}`}>
               {note.length} / {inviteLimit}
               {noteOver ? (
@@ -312,6 +314,7 @@ function LeadRow({
             ) : (
               <p className="text-xs text-slate-400">None — connected leads get the note.</p>
             )}
+            <Translation text={chatBusy ? '' : chat} />
             {editable ? (
               <p className={`mt-1 text-right text-[11px] tabular-nums ${chatOver ? 'font-medium text-red-700' : 'text-slate-400'}`}>
                 {chat.length} / {CHAT_CHAR_LIMIT}
@@ -646,6 +649,9 @@ export function OutreachPage() {
       <AutoStartNotice />
 
       {userId ? <ChatPromptPanel userId={userId} clientId={clientId} inviteQuota={inviteQuota} /> : null}
+      <section aria-label="Languages" className="card mb-6 px-5 py-4">
+        <LanguagePickers show="messages" />
+      </section>
 
       {noteWriting ? (
         <p className="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">

@@ -1,3 +1,4 @@
+import { LanguagePickers, Translation } from '../components/Languages';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, EmptyState, ErrorState, InlineError, PageHeader, SkeletonCards } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
@@ -166,6 +167,7 @@ export function CommentPromptPanel({
               ))}
             </select>
           </div>
+          <LanguagePickers show="translate" />
           {error ? <InlineError error={error} /> : null}
           <div className="flex items-center gap-3">
             <button type="button" className="btn-primary" onClick={() => void save()} disabled={saving || !loaded}>
@@ -334,6 +336,7 @@ function CommentRow({
                 onBlur={onBlurText}
                 aria-label="Comment text"
               />
+              <Translation text={text} lang={post.comment_language} />
               <p className={`mt-1 text-right text-[11px] tabular-nums ${over ? 'font-medium text-red-700' : 'text-slate-400'}`}>
                 {text.length.toLocaleString()} / {COMMENT_CHAR_LIMIT.toLocaleString()}
                 {over ? ' — too long for LinkedIn' : ''}
@@ -344,6 +347,7 @@ function CommentRow({
               {post.ai_comment_draft}
             </p>
           ) : null}
+          {status === 'queued' || status === 'posting' || status === 'posted' ? <Translation text={post.ai_comment_draft} lang={post.comment_language} /> : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {status === 'pending' ? (
