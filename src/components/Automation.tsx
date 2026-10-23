@@ -248,6 +248,7 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
                 </select>
               </label>
             </div>
+            <p className="text-xs text-slate-500">Your time zone also decides when a new day starts for your invite limit (midnight, your time).</p>
             {draft.work_days.length === 0 ? <p className="text-xs text-red-700">Pick at least one day.</p> : null}
             {draft.work_start === draft.work_end ? <p className="text-xs text-red-700">Start and end must differ.</p> : null}
           </fieldset>
