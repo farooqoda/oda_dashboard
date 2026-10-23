@@ -6,6 +6,7 @@ import { useAuth } from '../data/AuthProvider';
 import { guessTimeZone } from '../lib/automation';
 import {
   MAX_POST,
+  POST_LANGUAGES,
   PREVIEW_CHARS,
   deletePost,
   disconnectLinkedIn,
@@ -13,8 +14,10 @@ import {
   loadPosts,
   loadPublishState,
   publishNow,
+  rememberPostLanguage,
   retryPost,
   savePost,
+  savedPostLanguage,
   startLinkedInConnect,
   utcToZoned,
   writePosts,
@@ -175,6 +178,7 @@ function Composer({
   const [topic, setTopic] = useState('');
   const [tone, setTone] = useState('Professional');
   const [length, setLength] = useState('medium');
+  const [language, setLanguage] = useState(savedPostLanguage);
   const [drafts, setDrafts] = useState<string[]>([]);
   const [writing, setWriting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -200,7 +204,7 @@ function Composer({
     if (!user) return;
     setWriting(true);
     setErr(null);
-    const r = await writePosts(user.id, { topic, tone: tone.toLowerCase(), length, draft: improve ? body : undefined });
+    const r = await writePosts(user.id, { topic, tone: tone.toLowerCase(), length, language, draft: improve ? body : undefined });
     setWriting(false);
     if (r.error) return setErr(r.error);
     setDrafts(r.posts);
@@ -252,6 +256,20 @@ function Composer({
             <option value="short">Short</option>
             <option value="medium">Medium</option>
             <option value="long">Long</option>
+          </select>
+          <select
+            className="input w-auto py-1"
+            aria-label="Language"
+            value={language}
+            onChange={(e) => {
+              setLanguage(e.target.value);
+              rememberPostLanguage(e.target.value);
+            }}
+          >
+            {POST_LANGUAGES.map((l) => (
+              <option key={l}>{l}</option>
+            ))}
+            <option value="auto">Same as the topic</option>
           </select>
           <button type="button" className="btn-primary py-1.5" onClick={() => void write(false)} disabled={writing || !topic.trim()}>
             {writing ? 'Writing…' : 'Write 3 versions'}

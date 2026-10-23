@@ -26,6 +26,23 @@ export interface LinkedInConnection {
 }
 
 export const MAX_POST = 3000;
+/** Languages the AI writer offers on the Publish page ('auto' = the topic's language). */
+export const POST_LANGUAGES = ['English', 'Urdu', 'Roman Urdu', 'Arabic', 'Hindi', 'Punjabi', 'French', 'Spanish', 'German', 'Turkish'];
+const LANG_KEY = 'gab_publish_language';
+export function savedPostLanguage(): string {
+  try {
+    return localStorage.getItem(LANG_KEY) || 'English';
+  } catch {
+    return 'English';
+  }
+}
+export function rememberPostLanguage(v: string): void {
+  try {
+    localStorage.setItem(LANG_KEY, v);
+  } catch {
+    /* not kept: fine */
+  }
+}
 /** LinkedIn shows about this much of a post before "…see more". */
 export const PREVIEW_CHARS = 210;
 
@@ -107,7 +124,7 @@ export async function publishNow(): Promise<void> {
 
 export async function writePosts(
   userId: string,
-  p: { topic: string; tone: string; length: string; draft?: string },
+  p: { topic: string; tone: string; length: string; language: string; draft?: string },
 ): Promise<{ posts: string[]; error: null } | { posts: null; error: FriendlyError }> {
   try {
     const res = await fetch(POST_WRITER_WEBHOOK, {
