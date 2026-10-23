@@ -123,3 +123,7 @@ export const RESET_PASSWORD_REDIRECT_URL = 'https://connect.impactinnovationhub.
 
 /** Both password-reset paths — the emailed link and Settings — enforce this. */
 export const MIN_PASSWORD_LENGTH = 8;
+/** Batch E: AI drafts for the Publish page. `{ user_id, topic, tone, length, draft? }` → `{ ok, posts[] }`. */
+export const POST_WRITER_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/post-writer';
+/** Batch E: post everything that is due now (it also runs every 5 minutes). */
+export const PUBLISH_NOW_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/linkedin-publish';

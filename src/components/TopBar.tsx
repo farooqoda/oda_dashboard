@@ -14,6 +14,7 @@ const NAV = [
   { to: '/outreach', label: 'Message Studio', end: false },
   { to: '/posts', label: 'Conversations', end: false },
   { to: '/comments', label: 'Comments', end: false },
+  { to: '/publish', label: 'Publish', end: false },
   { to: '/prompts', label: 'Prompts', end: false },
   { to: '/analytics', label: 'Analytics', end: false },
 ];
@@ -109,7 +110,7 @@ export function TopBar() {
   const nav = manager ? [...NAV, { to: '/team', label: 'Team', end: false }] : NAV;
 
   const pill = ({ isActive }: { isActive: boolean }) =>
-    `whitespace-nowrap rounded-full px-3.5 py-2 text-sm transition-colors ${
+    `whitespace-nowrap rounded-full px-2.5 py-2 text-sm transition-colors 2xl:px-3.5 ${
       isActive ? 'bg-ink text-white' : 'text-slate-800 hover:bg-white'
     }`;
 

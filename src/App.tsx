@@ -16,6 +16,7 @@ import { PromptsPage } from './pages/PromptsPage';
 import { BulkLeadsPage } from './pages/BulkLeadsPage';
 import { PostsPage } from './pages/PostsPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { PublishPage } from './pages/PublishPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { TeamPage } from './pages/TeamPage';
@@ -35,6 +36,7 @@ function Shell() {
             <Route path="/comments" element={<CommentsPage />} />
             <Route path="/prompts" element={<PromptsPage />} />
             <Route path="/bulk-leads" element={<BulkLeadsPage />} />
+            <Route path="/publish" element={<PublishPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/team" element={<TeamPage />} />
