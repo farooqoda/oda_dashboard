@@ -52,7 +52,7 @@ function SettingsCard({ initial, onSaved }: { initial: BotSettings; onSaved: () 
           setSaved(false);
         }}
       />
-      <p className="mt-1 text-right text-[11px] tabular-nums text-slate-500">{knowledge.length.toLocaleString()} / 30,000</p>
+      <p className="mt-1 text-right text-[11px] tabular-nums text-slate-500">{knowledge.length.toLocaleString()} / 60,000</p>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1">
           <span className="label">Demo booking link</span>
