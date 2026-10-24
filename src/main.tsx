@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import '@fontsource-variable/urbanist/index.css';
+import '@fontsource-variable/montserrat/index.css';
 import './index.css';
 import { applyTheme, watchSystemTheme } from './lib/theme';
 

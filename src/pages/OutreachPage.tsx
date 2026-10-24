@@ -207,7 +207,7 @@ function LeadRow({
             <button
               type="button"
               onClick={() => onAction('details')}
-              className="block max-w-full truncate text-sm font-medium text-slate-900 underline-offset-2 hover:underline"
+              className="block max-w-full truncate text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
               title={displayName(lead)}
             >
               {displayName(lead)}

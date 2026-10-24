@@ -43,7 +43,7 @@ export function LinkAccountPage() {
         {error ? <FormError error={error} /> : null}
 
         <p className="text-sm text-slate-600">
-          Signed in as <span className="font-medium text-slate-900">{user?.email ?? 'unknown'}</span>
+          Signed in as <span className="font-semibold text-slate-900">{user?.email ?? 'unknown'}</span>
           . Enter an invite code to finish setting up access. Until then there is nothing to show —
           every lead query is scoped to the client your account belongs to.
         </p>

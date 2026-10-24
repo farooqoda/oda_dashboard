@@ -457,7 +457,7 @@ export function LeadsPage() {
                             <div className="flex min-w-0 items-center gap-2.5">
                               <Avatar name={displayName(lead)} size="sm" />
                               <span
-                                className="min-w-0 flex-1 truncate font-medium text-slate-900"
+                                className="min-w-0 flex-1 truncate font-semibold text-slate-900"
                                 title={displayName(lead)}
                               >
                                 {displayName(lead)}
@@ -525,7 +525,7 @@ export function LeadsPage() {
                     <div className="flex items-start gap-3">
                       <Avatar name={displayName(lead)} size="sm" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-slate-900">{displayName(lead)}</p>
+                        <p className="truncate font-semibold text-slate-900">{displayName(lead)}</p>
                         <p className="truncate text-xs text-slate-600">
                           {[lead.title?.trim(), lead.company?.trim()].filter(Boolean).join(' · ') ||
                             'No title or company recorded'}

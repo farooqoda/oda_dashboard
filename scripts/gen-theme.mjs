@@ -19,29 +19,31 @@ export const FAMILIES = ['red', 'amber', 'emerald', 'sky', 'green', 'yellow', 'b
 
 // The app's own palette (tailwind.config.js) — light and hand-tuned dark values
 export const CUSTOM = {
+  // Impact Innovation Hub brand: navy #0E2850 + teal #05A3AA, cool greys (was warm grey + yellow)
   slate: {
-    light: { 50: '#f7f6f3', 100: '#f0efeb', 200: '#e3e1db', 300: '#d7d5cf', 400: '#8e8d92', 500: '#66656a', 600: '#4d4c51', 700: '#3a3a3d', 800: '#232325', 900: '#1d1d1f' },
-    dark:  { 50: '#1a1a1d', 100: '#232327', 200: '#303035', 300: '#45454b', 400: '#8a8990', 500: '#b3b2b8', 600: '#cfced3', 700: '#e2e1e5', 800: '#efeef1', 900: '#f7f7f8' },
+    light: { 50: '#f4f7fa', 100: '#ebf0f5', 200: '#dce4ec', 300: '#c5d1dd', 400: '#7d8ba0', 500: '#536179', 600: '#3b4860', 700: '#29354b', 800: '#19243a', 900: '#0e1a2e' },
+    dark:  { 50: '#0f1726', 100: '#162033', 200: '#223049', 300: '#33435f', 400: '#8394ae', 500: '#aab8cc', 600: '#c8d3e1', 700: '#dde5ef', 800: '#edf2f7', 900: '#f6f9fc' },
   },
   brand: {
-    light: { 50: '#fdf7dc', 100: '#faedb8', 200: '#f5df8a', 300: '#f0cf55', 400: '#55545a', 500: '#2c2c2f', 600: '#1d1d1f', 700: '#1d1d1f', 800: '#1d1d1f', 900: '#111112' },
-    dark:  { 50: '#2a2410', 100: '#3a3214', 200: '#55481a', 300: '#8a7325', 400: '#c9c8cd', 500: '#f0c419', 600: '#f4f3f0', 700: '#f4f3f0', 800: '#f4f3f0', 900: '#ffffff' },
+    light: { 50: '#e6f6f7', 100: '#c9edef', 200: '#9edfe2', 300: '#5fcbd0', 400: '#3b4860', 500: '#14325e', 600: '#0e2850', 700: '#0e2850', 800: '#0b1f3f', 900: '#08162d' },
+    dark:  { 50: '#0c2a30', 100: '#0f3940', 200: '#145059', 300: '#1c7a82', 400: '#c8d3e1', 500: '#2bc4ca', 600: '#eaf2f8', 700: '#7fdde1', 800: '#eaf2f8', 900: '#ffffff' },
   },
   ink: {
-    light: { DEFAULT: '#1d1d1f', 800: '#232325', 700: '#3a3a3d', 300: '#9c9ba0', 200: '#cfcdc8' },
-    dark:  { DEFAULT: '#f4f3f0', 800: '#e6e5e2', 700: '#d0cfd3', 300: '#6e6d73', 200: '#3a3a3e' },
+    light: { DEFAULT: '#0e2850', 800: '#13305c', 700: '#1d3f70', 300: '#8fa0b8', 200: '#c9d3e0' },
+    dark:  { DEFAULT: '#eaf2f8', 800: '#dce6f0', 700: '#c5d3e2', 300: '#5d6e88', 200: '#2c3a52' },
   },
+  // the accent (was yellow): the logo's teal
   sun: {
-    light: { 50: '#fdf7dc', 100: '#fbeaa9', 300: '#f8e08a', 400: '#f5d24f', 500: '#f0c419' },
-    dark:  { 50: '#2a2410', 100: '#3a3214', 300: '#8a7325', 400: '#d9b53f', 500: '#f0c419' },
+    light: { 50: '#e6f7f7', 100: '#c7eeef', 300: '#7fd8dc', 400: '#2bb8be', 500: '#05a3aa' },
+    dark:  { 50: '#0c2a30', 100: '#0f3940', 300: '#1c7a82', 400: '#22b5bb', 500: '#2bc4ca' },
   },
   lead: {
     light: { 50: '#eff5fd', 500: '#2a78d6', 600: '#256abf', 700: '#1c5cab', 800: '#184f95' },
     dark:  { 50: '#10233a', 500: '#5b9be6', 600: '#74abec', 700: '#93bff1', 800: '#b2d2f5' },
   },
-  white:    { light: { DEFAULT: '#ffffff' }, dark: { DEFAULT: '#1c1c1f' } },
-  canvas:   { light: { DEFAULT: '#efefee' }, dark: { DEFAULT: '#111113' } },
-  line:     { light: { DEFAULT: '#e3e1db' }, dark: { DEFAULT: '#303035' } },
+  white:    { light: { DEFAULT: '#ffffff' }, dark: { DEFAULT: '#131d2e' } },
+  canvas:   { light: { DEFAULT: '#edf2f6' }, dark: { DEFAULT: '#0a1220' } },
+  line:     { light: { DEFAULT: '#dce4ec' }, dark: { DEFAULT: '#223049' } },
   good:     { light: { DEFAULT: '#0a8a0a' }, dark: { DEFAULT: '#4ade80' } },
   warning:  { light: { DEFAULT: '#fab219' }, dark: { DEFAULT: '#fbbf24' } },
   critical: { light: { DEFAULT: '#c62f2f' }, dark: { DEFAULT: '#f87171' } },

@@ -45,7 +45,7 @@ function LeadCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
       <div className="flex items-start gap-3">
         <Avatar name={displayName(lead)} size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-900" title={displayName(lead)}>
+          <p className="truncate text-sm font-semibold text-slate-900" title={displayName(lead)}>
             {displayName(lead)}
           </p>
           <p
@@ -160,7 +160,7 @@ export function DashboardPage() {
       <section className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
         <div className="min-w-0">
           <p className="text-sm text-slate-600">{hello}</p>
-          <h1 className="mt-2 text-[2.4rem] font-normal leading-[1.05] tracking-[-0.035em] text-ink sm:text-[3.4rem]">
+          <h1 className="mt-2 text-[2.2rem] font-extrabold leading-[1.08] tracking-[-0.025em] text-ink sm:text-[3.1rem]">
             Find the right people.
             <br />
             Build genuine professional relationships.
@@ -180,7 +180,7 @@ export function DashboardPage() {
             { v: stats.createdLast7, l: 'Added this week' },
           ].map((n) => (
             <div key={n.l}>
-              <p className="text-5xl font-light tabular-nums tracking-[-0.04em] text-ink sm:text-[4rem] sm:leading-none">
+              <p className="text-5xl font-bold tabular-nums tracking-[-0.03em] text-ink sm:text-[4rem] sm:leading-none">
                 {loading ? '–' : n.v.toLocaleString()}
               </p>
               <p className="mt-2 text-xs text-slate-600">{n.l}</p>
@@ -212,7 +212,7 @@ export function DashboardPage() {
       <div className="mt-10">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
-            <h2 className="text-xl font-normal tracking-tight text-ink">Pipeline</h2>
+            <h2 className="text-xl font-bold tracking-tight text-ink">Pipeline</h2>
             <span className="text-xs text-slate-500">Everyone you found, by stage ·</span>
             <span className="text-xs text-slate-500">
               {stages.length} {pluralise(stages.length, 'stage')}
@@ -320,7 +320,7 @@ export function DashboardPage() {
               >
                 <Avatar name={displayName(lead)} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900">{displayName(lead)}</p>
+                  <p className="truncate text-sm font-semibold text-slate-900">{displayName(lead)}</p>
                   <p className="truncate text-xs text-slate-600">
                     {[lead.title?.trim(), lead.company?.trim()].filter(Boolean).join(' · ') ||
                       'No title or company recorded'}

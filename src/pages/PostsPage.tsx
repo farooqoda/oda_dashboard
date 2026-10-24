@@ -316,7 +316,7 @@ export function PostsPage() {
                         className="cursor-pointer align-top transition-colors hover:bg-slate-50"
                       >
                         <td className="px-3 py-2.5">
-                          <span className="block truncate font-medium text-slate-900" title={post.author_name ?? undefined}>
+                          <span className="block truncate font-semibold text-slate-900" title={post.author_name ?? undefined}>
                             {post.author_name || 'Unknown'}
                           </span>
                         </td>

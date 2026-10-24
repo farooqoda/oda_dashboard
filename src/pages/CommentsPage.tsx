@@ -258,12 +258,12 @@ function CommentRow({
                     href={post.author_linkedin_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm font-medium text-slate-900 underline-offset-2 hover:underline"
+                    className="text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
                   >
                     {post.author_name || 'Unknown'}
                   </a>
                 ) : (
-                  <span className="text-sm font-medium text-slate-900">{post.author_name || 'Unknown'}</span>
+                  <span className="text-sm font-semibold text-slate-900">{post.author_name || 'Unknown'}</span>
                 )}
                 {link ? (
                   <a

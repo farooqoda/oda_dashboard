@@ -203,7 +203,7 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
     >
       <div className="space-y-6">
         <section>
-          <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-900">
+          <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900">
             Your time zone
             <select className="input w-auto max-w-[16rem] py-1 font-normal" aria-label="Time zone" value={draft.work_tz} onChange={(e) => set({ work_tz: e.target.value })}>
               {(zones.includes(draft.work_tz) ? zones : [draft.work_tz, ...zones]).map((z) => (
@@ -220,7 +220,7 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
         </section>
 
         <section aria-labelledby="hours-h" className="border-t border-slate-100 pt-5">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-900" id="hours-h">
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-900" id="hours-h">
             <input type="checkbox" checked={draft.schedule_on} onChange={(e) => set({ schedule_on: e.target.checked })} />
             Only work in my working hours
           </label>
@@ -261,7 +261,7 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
         </section>
 
         <section aria-labelledby="warm-h" className="border-t border-slate-100 pt-5">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-900" id="warm-h">
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-900" id="warm-h">
             <input type="checkbox" checked={draft.warmup_on} onChange={(e) => set({ warmup_on: e.target.checked })} />
             Warm up a new LinkedIn account
           </label>
@@ -279,7 +279,7 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
         </section>
 
         <section aria-labelledby="fu-h" className="border-t border-slate-100 pt-5">
-          <p className="text-sm font-medium text-slate-900" id="fu-h">
+          <p className="text-sm font-semibold text-slate-900" id="fu-h">
             Follow-ups
           </p>
           <p className="mt-1 text-xs text-slate-500">
@@ -334,7 +334,7 @@ export function AutomationCard({ dailyInviteLimit }: { dailyInviteLimit: number 
         </section>
 
         <section className="border-t border-slate-100 pt-5">
-          <p className="text-sm font-medium text-slate-900">Safety</p>
+          <p className="text-sm font-semibold text-slate-900">Safety</p>
           <p className="mt-1 text-xs text-slate-500">
             If LinkedIn shows a security check or warning, the extension stops at once and automatic runs pause for 24 hours. A run
             also stops after 3 failures in a row.
@@ -416,7 +416,7 @@ export function MorningEmailCard() {
   return (
     <Card title="Morning email" description="Your “Today” list by email: who wrote back, follow-ups to approve, failed sends, and anything blocking your automation.">
       <div className="space-y-3 text-sm">
-        <label className="flex items-center gap-2 font-medium text-slate-900">
+        <label className="flex items-center gap-2 font-semibold text-slate-900">
           <input type="checkbox" checked={curOn} onChange={(e) => setOn(e.target.checked)} />
           Send me the morning email
         </label>

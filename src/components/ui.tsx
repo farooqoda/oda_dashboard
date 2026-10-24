@@ -130,8 +130,9 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="font-display text-[2.25rem] font-normal leading-tight tracking-[-0.03em] text-ink sm:text-[2.75rem]">{title}</h1>
-        {description ? <p className="mt-2 max-w-3xl text-sm text-slate-600">{description}</p> : null}
+        <h1 className="font-display text-[2rem] font-extrabold leading-tight tracking-[-0.02em] text-ink sm:text-[2.4rem]">{title}</h1>
+        <span aria-hidden="true" className="mt-2 block h-1 w-12 rounded-full bg-gradient-to-r from-ink to-sun-500" />
+        {description ? <p className="mt-3 max-w-3xl text-sm text-slate-600">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
@@ -156,7 +157,7 @@ export function Card({
       {(title || actions) && (
         <header className="flex items-start justify-between gap-3 border-b border-slate-200/80 px-6 py-4">
           <div>
-            {title ? <h2 className="text-base font-medium text-slate-900">{title}</h2> : null}
+            {title ? <h2 className="text-base font-bold text-ink">{title}</h2> : null}
             {description ? <p className="mt-0.5 text-xs text-slate-500">{description}</p> : null}
           </div>
           {actions}
