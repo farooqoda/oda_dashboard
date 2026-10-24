@@ -80,9 +80,9 @@ export function SuggestedCard({ lead, onOpen }: { lead: Lead | null; onOpen: (id
   const name = displayName(lead);
   const score = fitScore(lead.traits);
   return (
-    <div className="keep-light relative flex min-h-[300px] flex-col overflow-hidden rounded-tile bg-gradient-to-b from-[#dcdad4] via-[#c9c6bf] to-[#8d8a84]">
+    <div className="keep-light relative flex min-h-[300px] flex-col overflow-hidden rounded-tile bg-gradient-to-b from-[#d5e3ee] via-[#9fbdd2] to-[#2f5f86]">
       <div className="flex flex-1 items-center justify-center pt-6">
-        <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white/40 text-4xl font-light tracking-tight text-ink">
+        <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white/40 text-4xl font-semibold tracking-tight text-ink">
           {initialsOf(name)}
         </span>
       </div>
@@ -118,7 +118,7 @@ export function NetworkCard({ nodes, activeThisWeek, onOpen }: { nodes: NetworkN
   return (
     <div className="tile flex min-h-[300px] flex-col">
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-xl font-normal tracking-tight text-ink">Your network</h2>
+        <h2 className="text-xl font-bold tracking-tight text-ink">Your network</h2>
         {activeThisWeek > 0 ? (
           <span className="rounded-full bg-sun-400 px-2.5 py-0.5 text-xs text-ink">+{activeThisWeek} this week</span>
         ) : null}
@@ -135,7 +135,7 @@ export function NetworkCard({ nodes, activeThisWeek, onOpen }: { nodes: NetworkN
                 <line
                   key={n.lead.id}
                   x1="50" y1="50" x2={spots[i].x} y2={spots[i].y}
-                  stroke={n.replied ? '#f0c419' : '#a9a8ac'}
+                  stroke={n.replied ? '#05a3aa' : '#9aa7b8'}
                   strokeWidth={n.replied ? 0.9 : 0.5}
                   strokeDasharray={n.replied ? undefined : '1.5 1.5'}
                   vectorEffect="non-scaling-stroke"
@@ -160,7 +160,7 @@ export function NetworkCard({ nodes, activeThisWeek, onOpen }: { nodes: NetworkN
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-600">Yellow: active this week. Solid lines: they replied.</p>
+          <p className="text-xs text-slate-600">Teal: active this week. Solid lines: they replied.</p>
         </>
       )}
     </div>
@@ -176,13 +176,13 @@ export function OutreachCard({ days, total }: { days: DayBar[]; total: number })
   return (
     <div className="tile flex min-h-[300px] flex-col">
       <div className="flex items-start justify-between">
-        <h2 className="text-xl font-normal tracking-tight text-ink">Outreach</h2>
+        <h2 className="text-xl font-bold tracking-tight text-ink">Outreach</h2>
         <Link to="/outreach" aria-label="Open Message Studio" className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink hover:bg-slate-100">
           ↗
         </Link>
       </div>
       <p className="mt-3 flex items-end gap-2">
-        <span className="text-4xl font-light tabular-nums tracking-tight text-ink">{total}</span>
+        <span className="text-4xl font-bold tabular-nums tracking-tight text-ink">{total}</span>
         <span className="pb-1 text-xs leading-tight text-slate-600">
           {total === 1 ? 'message' : 'messages'}
           <br />
@@ -229,8 +229,8 @@ export function ReplyRateCard({ sent, accepted, replied, rate }: { sent: number;
   return (
     <div className="tile">
       <div className="flex items-start justify-between">
-        <h2 className="text-xl font-normal tracking-tight text-ink">Reply rate</h2>
-        <span className="text-4xl font-light tabular-nums tracking-tight text-ink">{rate === null ? '—' : `${rate}%`}</span>
+        <h2 className="text-xl font-bold tracking-tight text-ink">Reply rate</h2>
+        <span className="text-4xl font-bold tabular-nums tracking-tight text-ink">{rate === null ? '—' : `${rate}%`}</span>
       </div>
       <div className="mt-4 flex items-end gap-1.5">
         {parts.map((p) => (
@@ -251,8 +251,8 @@ export function QueueCard({ rows, done, total, onOpen }: { rows: QueueRow[]; don
   return (
     <div className="tile-dark flex flex-1 flex-col">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-xl font-normal tracking-tight">Message queue</h2>
-        <span className="text-3xl font-light tabular-nums">
+        <h2 className="text-xl font-bold tracking-tight">Message queue</h2>
+        <span className="text-3xl font-bold tabular-nums">
           {done}/{total}
         </span>
       </div>
@@ -446,7 +446,7 @@ export function FollowUpTracker({ items, onOpen }: { items: FollowUp[]; onOpen: 
         <button type="button" className="rounded-full bg-white px-3 py-1 text-xs text-slate-800 hover:bg-slate-100" onClick={() => { setOffset((o) => o - 1); setExpanded(null); }}>
           ‹ Last week
         </button>
-        <h2 className="text-center text-base font-normal text-ink sm:text-lg">
+        <h2 className="text-center text-base font-bold text-ink sm:text-lg">
           Follow-up tracker · {range}
         </h2>
         <button type="button" className="rounded-full bg-white px-3 py-1 text-xs text-slate-800 hover:bg-slate-100" onClick={() => { setOffset((o) => o + 1); setExpanded(null); }}>

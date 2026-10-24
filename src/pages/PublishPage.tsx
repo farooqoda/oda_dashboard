@@ -123,7 +123,7 @@ function ConnectionCard({
             <img src={conn.picture} alt="" className="h-12 w-12 rounded-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
           ) : null}
           <div className="min-w-0">
-            <p className="font-medium text-slate-900">{conn.name ?? 'LinkedIn account'}</p>
+            <p className="font-semibold text-slate-900">{conn.name ?? 'LinkedIn account'}</p>
             <p className="text-xs text-slate-500">{conn.email}</p>
             {expired ? (
               <p className="mt-1 text-xs font-medium text-red-700">Connection expired. Reconnect so scheduled posts can go out.</p>

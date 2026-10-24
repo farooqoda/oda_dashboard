@@ -31,8 +31,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Impact Connect: one face (Urbanist) for headings and data alike.
-        display: ['"Urbanist Variable"', 'Urbanist', 'system-ui', 'sans-serif'],
+        // Headings: Montserrat (the Impact Innovation Hub logo's face); text and data: Urbanist.
+        display: ['"Montserrat Variable"', 'Montserrat', '"Urbanist Variable"', 'system-ui', 'sans-serif'],
         sans: ['"Urbanist Variable"', 'Urbanist', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
       },
       // Every colour is a CSS variable (src/theme.css) so the dark theme can swap them all at once.

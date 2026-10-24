@@ -79,7 +79,7 @@ export function LoginPage() {
       >
         <p className="text-sm text-slate-700">
           Open the link in the email sent to{' '}
-          <span className="font-medium text-slate-900">{email.trim()}</span> to choose a new
+          <span className="font-semibold text-slate-900">{email.trim()}</span> to choose a new
           password. It expires after a few minutes and works once.
         </p>
       </AuthLayout>

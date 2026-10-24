@@ -148,7 +148,7 @@ function MemberTable({ rows }: { rows: ActivityRow[] }) {
           {rows.map((m) => (
             <tr key={m.client_id + m.user_id} className="border-b border-slate-100 align-top last:border-0">
               <td className="px-4 py-3">
-                <p className="font-medium text-slate-900">{m.email ?? m.user_id}</p>
+                <p className="font-semibold text-slate-900">{m.email ?? m.user_id}</p>
                 <p className="text-xs text-slate-500">
                   {m.last_activity_at ? `Last send ${formatDateTime(m.last_activity_at)}` : 'Nothing sent yet'}
                   {m.ext_version ? ` · v${m.ext_version}` : ''}
@@ -436,7 +436,7 @@ function LegacyTeamPage() {
             <tbody>
               {rows.map((m) => (
                 <tr key={m.user_id} className="border-b border-slate-100 align-top last:border-0">
-                  <td className="px-4 py-3 font-medium text-slate-900">{m.email ?? m.user_id}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-900">{m.email ?? m.user_id}</td>
                   {(['invites', 'messages', 'followups', 'accepted', 'replies', 'replies_sent', 'queued'] as const).map((k) => (
                     <td key={k} className="px-2 py-3 text-right tabular-nums">
                       {Number(m[k]) || 0}

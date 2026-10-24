@@ -45,7 +45,7 @@ export function SignUpPage() {
         <div className="space-y-3 text-sm text-slate-700">
           <p>
             A confirmation link has been emailed to{' '}
-            <span className="font-medium text-slate-900">{email.trim()}</span>. Open it, then sign
+            <span className="font-semibold text-slate-900">{email.trim()}</span>. Open it, then sign
             in.
           </p>
           {inviteCode.trim() ? (

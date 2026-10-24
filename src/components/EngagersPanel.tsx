@@ -176,7 +176,7 @@ export function EngagersPanel({
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-6 py-4">
           <div className="min-w-0">
             <p className="text-xs text-slate-500">People who engaged with the post by</p>
-            <h2 id="eg-title" className="truncate text-xl font-normal tracking-tight text-ink">
+            <h2 id="eg-title" className="truncate text-xl font-bold tracking-tight text-ink">
               {post.author_name || 'Unknown'}
             </h2>
             {post.post_text ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{post.post_text}</p> : null}
@@ -259,7 +259,7 @@ export function EngagersPanel({
                       aria-label={`Select ${r.full_name ?? 'person'}`} />
                     <div className="min-w-0 flex-1">
                       <p className="flex flex-wrap items-center gap-x-2 text-sm">
-                        <a href={r.linkedin_url} target="_blank" rel="noreferrer" className="font-medium text-slate-900 hover:underline">
+                        <a href={r.linkedin_url} target="_blank" rel="noreferrer" className="font-semibold text-slate-900 hover:underline">
                           {r.full_name || 'LinkedIn member'}
                         </a>
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">

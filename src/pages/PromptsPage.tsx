@@ -359,7 +359,7 @@ function InviteLength({
               onChange={() => void pick(o.value)}
             />
             <span>
-              <span className="block text-sm font-medium text-slate-900">{o.label}</span>
+              <span className="block text-sm font-semibold text-slate-900">{o.label}</span>
               <span className="block text-xs text-slate-600">{o.hint}</span>
             </span>
           </label>

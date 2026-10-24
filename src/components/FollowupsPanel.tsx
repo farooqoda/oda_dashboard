@@ -113,7 +113,7 @@ function DraftRow({
             <button
               type="button"
               onClick={() => onOpen(lead.id)}
-              className="block max-w-full truncate text-sm font-medium text-slate-900 underline-offset-2 hover:underline"
+              className="block max-w-full truncate text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
             >
               {displayName(lead)}
             </button>

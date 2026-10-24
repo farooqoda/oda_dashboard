@@ -4,6 +4,7 @@ import { useAuth } from '../data/AuthProvider';
 import { useExtensionTask } from '../lib/extensionBridge';
 import { firstNameOf, fullNameOf, userInitials } from '../lib/person';
 import { useIsManager } from '../lib/team';
+import { BrandLogo } from './Brand';
 import { Bell } from './Today';
 import { ThemeChooser, ThemeToggle } from './ThemeToggle';
 
@@ -29,7 +30,7 @@ function ExtensionPill() {
       type="button"
       onClick={status === 'missing' ? recheck : undefined}
       title={status === 'missing' ? 'Extension not detected — click to check again' : text}
-      className="hidden items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-sm text-slate-800 sm:inline-flex"
+      className="hidden items-center gap-2 rounded-full border border-slate-200/80 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm sm:inline-flex"
     >
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
       {/* short form on narrower screens so the bar fits on one line */}
@@ -72,7 +73,7 @@ function AccountMenu() {
         <div className="absolute right-0 z-40 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
           {user?.email ? (
             <div className="px-3 py-2">
-              {full ? <p className="truncate text-sm font-medium text-slate-900">{full}</p> : null}
+              {full ? <p className="truncate text-sm font-semibold text-slate-900">{full}</p> : null}
               <p className="truncate text-xs text-slate-500" title={user.email}>
                 {user.email}
               </p>
@@ -111,20 +112,18 @@ export function TopBar() {
 
   const pill = ({ isActive }: { isActive: boolean }) =>
     `whitespace-nowrap rounded-full px-2.5 py-2 text-sm transition-colors 2xl:px-3.5 ${
-      isActive ? 'bg-ink text-white' : 'text-slate-800 hover:bg-white'
+      isActive ? 'bg-ink font-semibold text-white shadow-sm' : 'font-medium text-slate-700 hover:bg-sun-50 hover:text-ink'
     }`;
 
   return (
-    <header className="mx-auto max-w-[1600px] px-4 pt-5 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-canvas/85 shadow-[0_6px_20px_-16px_rgba(14,40,80,0.45)] backdrop-blur-md">
+      <div className="mx-auto max-w-[1600px] px-4 py-3 sm:px-6 lg:px-8">
       <div className="flex items-center gap-3">
-        <Link
-          to="/"
-          className="shrink-0 rounded-full border border-slate-400/70 px-5 py-2 text-lg font-medium tracking-tight text-ink sm:text-xl"
-        >
-          Impact Connect
+        <Link to="/" className="shrink-0" aria-label="Impact Connect home">
+          <BrandLogo />
         </Link>
 
-        <nav aria-label="Main" className="mx-auto hidden rounded-full bg-white/60 p-1 xl:flex">
+        <nav aria-label="Main" className="mx-auto hidden rounded-full border border-slate-200/80 bg-white/80 p-1 shadow-sm xl:flex">
           {nav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={pill}>
               {item.label}
@@ -157,6 +156,7 @@ export function TopBar() {
           ))}
         </nav>
       ) : null}
+      </div>
     </header>
   );
 }

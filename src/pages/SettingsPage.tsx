@@ -346,7 +346,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
       <span className="text-sm text-slate-600">{label}</span>
-      <span className="break-words text-sm font-medium text-slate-900">{value}</span>
+      <span className="break-words text-sm font-semibold text-slate-900">{value}</span>
     </div>
   );
 }

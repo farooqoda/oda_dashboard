@@ -42,7 +42,7 @@ function LimitRow({ m, onSaved }: { m: MemberLimit; onSaved: (m: MemberLimit) =>
   return (
     <tr className="border-b border-slate-100 align-top last:border-0">
       <td className="px-4 py-3">
-        <p className="font-medium text-slate-900">{who}</p>
+        <p className="font-semibold text-slate-900">{who}</p>
         <p className="text-xs text-slate-500">
           {m.invites_today} {m.invites_today === 1 ? 'invite' : 'invites'} since {resetText(m.tz)}
         </p>
