@@ -222,9 +222,14 @@ export function TeamPage() {
         title="Team"
         actions={
           admin ? (
-            <Link to="/team/manage" className="btn-primary">
-              Manage teams
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/team/website-chat" className="btn-secondary">
+                Website chat
+              </Link>
+              <Link to="/team/manage" className="btn-primary">
+                Manage teams
+              </Link>
+            </div>
           ) : undefined
         }
         description={
