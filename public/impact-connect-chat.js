@@ -110,7 +110,13 @@
   function linkify(text, node) {
     var parts = String(text).split(/(https?:\/\/[^\s)]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g);
     parts.forEach(function (p) {
-      if (/^https?:\/\//.test(p)) node.appendChild(el('a', { href: p, target: '_blank', rel: 'noopener', text: p }));
+      if (/^https?:\/\//.test(p)) {
+        // A sentence-ending . , ; : ! ? ' " is not part of the link (it made the booking link 404).
+        var m = p.match(/^(.*?)([.,;:!?'"\u2019\u201d]+)?$/);
+        var url = m[1], tail = m[2] || '';
+        node.appendChild(el('a', { href: url, target: '_blank', rel: 'noopener', text: url }));
+        if (tail) node.appendChild(document.createTextNode(tail));
+      }
       else if (/@/.test(p) && /^[^\s]+@[^\s]+$/.test(p)) node.appendChild(el('a', { href: 'mailto:' + p, text: p }));
       else node.appendChild(document.createTextNode(p));
     });
