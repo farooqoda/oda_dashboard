@@ -36,7 +36,7 @@ export function SetupCompletePage() {
       <div className="space-y-5">
         <section>
           <h2 className="text-sm font-semibold text-slate-900">
-            Your LinkedIn extension key
+            License key
           </h2>
 
           {outcome === null ? (
