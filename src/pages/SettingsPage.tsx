@@ -132,12 +132,12 @@ function LicenseKeyBlock({ record }: { record: AccountRecord | null }) {
 
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">
-      <h3 className="text-sm font-semibold text-slate-900">Your LinkedIn extension key</h3>
+      <h3 className="text-sm font-semibold text-slate-900">License key</h3>
 
       {record === null || key === undefined ? (
         <div className="mt-2">
           <div className="skeleton h-10 w-full" />
-          <p className="mt-2 text-xs text-slate-500">Reading your account…</p>
+          <p className="mt-2 text-sm text-slate-500">Reading your account…</p>
         </div>
       ) : key.state === 'found' ? (
         <>
@@ -147,13 +147,13 @@ function LicenseKeyBlock({ record }: { record: AccountRecord | null }) {
             </code>
             <CopyButton text={key.licenseKey} className="btn-secondary shrink-0" />
           </div>
-          <p className="mt-2 text-xs text-slate-600">
+          <p className="mt-2 text-sm text-slate-600">
             Paste this as your password when the LinkedIn extension asks you to log in, using the
             email on your account. It is not the password you signed in here with.
           </p>
         </>
       ) : (
-        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
           <p className="font-medium">
             {key.state === 'missing'
               ? 'Your key could not be found.'
@@ -169,7 +169,7 @@ function LicenseKeyBlock({ record }: { record: AccountRecord | null }) {
             </p>
           ) : null}
 
-          <p className="mt-1.5 break-words font-mono text-[11px] text-amber-800">{key.detail}</p>
+          <p className="mt-1.5 break-words font-mono text-sm text-amber-800">{key.detail}</p>
 
           {key.state === 'error' && key.error.hint ? (
             <p className="mt-1.5">{key.error.hint}</p>
@@ -239,9 +239,9 @@ function ChangePasswordSection() {
   return (
     <div className="mt-4 border-t border-slate-100 pt-4">
       <h3 className="text-sm font-semibold text-slate-900">Change password</h3>
-      <p className="mt-1 text-xs text-slate-600">
+      <p className="mt-1 text-sm text-slate-600">
         This is the password you sign in to this dashboard with — separate from the LinkedIn
-        extension key above.
+        license key above.
       </p>
 
       <form onSubmit={(e) => void onSubmit(e)} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -282,14 +282,14 @@ function ChangePasswordSection() {
       </form>
 
       {error ? (
-        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
           <p className="font-medium">{error.message}</p>
           {error.hint ? <p className="mt-1">{error.hint}</p> : null}
         </div>
       ) : null}
 
       {success ? (
-        <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+        <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           Password changed.
         </p>
       ) : null}
@@ -336,7 +336,7 @@ function NameRow() {
         <button type="button" className="btn-secondary" disabled={busy || !v.trim() || v.trim() === current} onClick={() => void save()}>
           {busy ? 'Saving…' : 'Save name'}
         </button>
-        {msg ? <span className={`text-xs ${msg === 'Saved.' ? 'text-good' : 'text-critical'}`}>{msg}</span> : null}
+        {msg ? <span className={`text-sm ${msg === 'Saved.' ? 'text-good' : 'text-critical'}`}>{msg}</span> : null}
       </span>
     </div>
   );
@@ -384,11 +384,11 @@ export function SettingsPage() {
                 record === null ? (
                   <span className="skeleton inline-block h-3 w-32 align-middle" />
                 ) : (
-                  record.email ?? 'Not set'
+                  record.email ?? user?.email ?? 'Not set'
                 )
               }
             />
-            <Row label="Client" value={clientName ?? clientId ?? 'Not linked to a client'} />
+            <Row label="Account" value={clientName ?? (clientId && /^c_/.test(clientId) ? 'Individual account' : clientId) ?? 'Not linked yet'} />
             <Row
               label="Total leads in your account"
               value={
@@ -404,7 +404,7 @@ export function SettingsPage() {
           </div>
 
           {count !== null && count > MAX_ROWS ? (
-            <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Your account holds more leads than the dashboard loads at once. Screens are built
               from the {MAX_ROWS.toLocaleString()} most recent leads, not all{' '}
               {count.toLocaleString()}.
@@ -449,7 +449,7 @@ export function SettingsPage() {
           </div>
 
           {!connected ? (
-            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
               Your lead data could not be reached just now. Try reloading the page; if it keeps
               happening, contact support with the time you saw this.
             </p>
@@ -466,7 +466,7 @@ export function SettingsPage() {
               </a>
               .
             </p>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-sm text-slate-500">
               Lead profiling, message generation and account provisioning all run outside this
               dashboard and are not configurable here.
             </p>

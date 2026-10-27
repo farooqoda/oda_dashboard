@@ -107,7 +107,7 @@ export const COMMENT_CHAR_LIMIT = 1250;
  * Shown on Settings and wherever the user needs a human. Change this to the
  * address your team actually monitors.
  */
-export const SUPPORT_EMAIL = 'support@ontariodigitalacademy.org';
+export const SUPPORT_EMAIL = 'bashir@ontariodigitalacademy.org';
 
 /**
  * Where a password-reset email sends the user back to. Supabase Auth only
