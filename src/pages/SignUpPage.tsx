@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout, Field, FormError } from '../components/AuthLayout';
 import { useAuth } from '../data/AuthProvider';
 import type { FriendlyError } from '../lib/supabase';
 
 export function SignUpPage() {
   const { status, signUp } = useAuth();
-  const [email, setEmail] = useState('');
+  // The welcome email links here with ?email=… so a new customer only has to choose a password.
+  const [params] = useSearchParams();
+  const [email, setEmail] = useState(() => (params.get('email') || '').trim().slice(0, 254));
   const [password, setPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<FriendlyError | null>(null);
@@ -62,7 +64,7 @@ export function SignUpPage() {
   return (
     <AuthLayout
       title="Sign up"
-      description="Team members: sign up with your work email. Clients: use the invite code you were given."
+      description="Use the same email address you used when you signed up on our website, and choose a password. You do not need an invite code."
       footer={
         <>
           Already have an account?{' '}
@@ -94,12 +96,12 @@ export function SignUpPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <Field
-          label="Invite code (if you were given one)"
+          label="Invite code (optional)"
           type="text"
           name="inviteCode"
           spellCheck={false}
           autoCapitalize="none"
-          hint="Leave empty if your work email was added by your administrator. Codes are matched exactly, including capitalisation."
+          hint="Leave this empty if you signed up on our website or your email was added by your administrator. Only enter a code if someone gave you one (codes are matched exactly, including capitalisation)."
           value={inviteCode}
           onChange={(e) => setInviteCode(e.target.value)}
         />
