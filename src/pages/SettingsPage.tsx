@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AutomationCard, MorningEmailCard } from '../components/Automation';
 import { MyLimitsCard } from '../components/Limits';
+import { PaceCard } from '../components/PaceCard';
 import { Card, CopyButton, PageHeader } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import { fullNameOf } from '../lib/person';
@@ -475,6 +476,7 @@ export function SettingsPage() {
 
         <div className="space-y-6 lg:col-span-2">
           <MyLimitsCard />
+          <PaceCard />
           <AutomationCard dailyInviteLimit={inviteQuota} />
           <MorningEmailCard />
         </div>

@@ -6,6 +6,7 @@ import { TopBar } from './components/TopBar';
 import { AuthProvider } from './data/AuthProvider';
 import { LeadsProvider } from './data/LeadsProvider';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { AutopilotPage } from './pages/AutopilotPage';
 import { CommentsPage } from './pages/CommentsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LeadsPage } from './pages/LeadsPage';
@@ -34,6 +35,7 @@ function Shell() {
             <Route path="/leads" element={<LeadsPage />} />
             <Route path="/outreach" element={<OutreachPage />} />
             <Route path="/posts" element={<PostsPage />} />
+            <Route path="/autopilot" element={<AutopilotPage />} />
             <Route path="/comments" element={<CommentsPage />} />
             <Route path="/prompts" element={<PromptsPage />} />
             <Route path="/bulk-leads" element={<BulkLeadsPage />} />

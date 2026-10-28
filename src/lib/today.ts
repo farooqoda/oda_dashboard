@@ -9,7 +9,7 @@ import type { Lead } from './types';
  * and (built the same way by n8n) in the morning email.
  */
 export interface TodayItem {
-  key: 'paused' | 'replies' | 'followups' | 'failed' | 'auto_off' | 'ext_missing' | 'accepted';
+  key: 'paused' | 'replies' | 'followups' | 'warm_leads' | 'failed' | 'auto_off' | 'ext_missing' | 'accepted';
   icon: string;
   text: string;
   to: string; // a dashboard path, or an https:// link
@@ -58,6 +58,17 @@ export function todayItems(leads: Lead[], userId: string | null, s: AutomationSe
   const accepted = mine.filter((l) => l.connected_detected_at && now - new Date(l.connected_detected_at).getTime() < DAY).length;
   if (accepted) items.push({ key: 'accepted', icon: '🤝', tone: 'slate', count: accepted, to: '/outreach?tab=sent', text: `${accepted} invite${accepted === 1 ? ' was' : 's were'} accepted in the last day` });
   return items;
+}
+
+/** Autopilot (SQL h2): warm leads with a note, waiting for approval. Placed after replies and follow-ups. */
+export function withWarmLeads(items: TodayItem[], ready: number): TodayItem[] {
+  if (!ready) return items;
+  const item: TodayItem = {
+    key: 'warm_leads', icon: '🔥', tone: 'green', count: ready, to: '/autopilot',
+    text: `${ready} new warm lead${ready === 1 ? '' : 's'} from Autopilot — notes ready for your approval`,
+  };
+  const at = items.findIndex((i) => !['paused', 'replies', 'followups'].includes(i.key));
+  return at === -1 ? [...items, item] : [...items.slice(0, at), item, ...items.slice(at)];
 }
 
 /** The number on the bell: things that need the member to act. */
