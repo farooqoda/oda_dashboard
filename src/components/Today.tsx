@@ -2,14 +2,36 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
-import { bellCount, todayItems, type TodayItem } from '../lib/today';
+import { AP_READY_CHANGED, loadReadyCount } from '../lib/autopilot';
+import { bellCount, todayItems, withWarmLeads, type TodayItem } from '../lib/today';
 import { useAutomation } from './Automation';
+
+/** Warm leads waiting for approval (one shared, cached request for every Today/bell on the page). */
+function useWarmLeadsReady(userId: string | null) {
+  const [ready, setReady] = useState(0);
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+    const load = (force = false) => void loadReadyCount(force).then((n) => live && setReady(n));
+    load();
+    const onChange = () => load(true);
+    window.addEventListener(AP_READY_CHANGED, onChange);
+    const t = window.setInterval(() => load(true), 5 * 60 * 1000);
+    return () => {
+      live = false;
+      window.removeEventListener(AP_READY_CHANGED, onChange);
+      window.clearInterval(t);
+    };
+  }, [userId]);
+  return ready;
+}
 
 export function useToday() {
   const { leads } = useLeads();
   const { user } = useAuth();
   const { settings } = useAutomation();
-  const items = useMemo(() => todayItems(leads, user?.id ?? null, settings), [leads, user, settings]);
+  const ready = useWarmLeadsReady(user?.id ?? null);
+  const items = useMemo(() => withWarmLeads(todayItems(leads, user?.id ?? null, settings), ready), [leads, user, settings, ready]);
   return { items, count: bellCount(items) };
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, EmptyState, InlineError, PageHeader, SkeletonTable } from '../components/ui';
+import { Card, EmptyState, FitBadge, InlineError, PageHeader, SkeletonTable } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import {
   AP_DEFAULTS,
@@ -8,7 +8,9 @@ import {
   addSignal,
   deleteSignal,
   isMissingAutopilot,
-  loadAutopilotLeads,
+  forgetReadyCount,
+  hasPhase2,
+  loadWarmLeads,
   loadAutopilotSettings,
   loadSignalStats,
   loadSignals,
@@ -21,7 +23,10 @@ import {
   type Signal,
   type SignalKind,
   type SignalStats,
+  type WarmLead,
 } from '../lib/autopilot';
+import { FIT_HIGH } from '../lib/constants';
+import { queueLeads } from '../lib/messages';
 import { useExtensionTask } from '../lib/extensionBridge';
 import { formatDateTime } from '../lib/format';
 import type { FriendlyError } from '../lib/supabase';
@@ -40,7 +45,7 @@ const STATUS_TEXT: Record<AutopilotLead['status'], { text: string; cls: string }
   queued: { text: 'Waiting to sync', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
   new: { text: 'In People Search', cls: 'bg-slate-50 text-slate-700 border-slate-200' },
   scraping: { text: 'Syncing now', cls: 'bg-sky-50 text-sky-800 border-sky-200' },
-  done: { text: 'Note ready', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  done: { text: 'Synced', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
   failed: { text: 'Sync failed', cls: 'bg-red-50 text-red-800 border-red-200' },
   skipped: { text: 'Skipped', cls: 'bg-slate-50 text-slate-500 border-slate-200' },
 };
@@ -87,7 +92,7 @@ export function AutopilotPage() {
   const [draft, setDraft] = useState<AutopilotSettings>(AP_DEFAULTS);
   const [signals, setSignals] = useState<Signal[] | null>(null);
   const [stats, setStats] = useState<Record<number, SignalStats>>({});
-  const [leads, setLeads] = useState<AutopilotLead[] | null>(null);
+  const [leads, setLeads] = useState<WarmLead[] | null>(null);
   const [loadError, setLoadError] = useState<FriendlyError | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -100,7 +105,7 @@ export function AutopilotPage() {
 
   const reload = useCallback(async () => {
     if (!userId) return;
-    const [s, sig, st, ld] = await Promise.all([loadAutopilotSettings(userId), loadSignals(), loadSignalStats(), loadAutopilotLeads()]);
+    const [s, sig, st, ld] = await Promise.all([loadAutopilotSettings(userId), loadSignals(), loadSignalStats(), loadWarmLeads()]);
     const firstError = s.error ?? sig.error ?? st.error ?? ld.error;
     if (firstError) {
       setMissing(isMissingAutopilot(firstError));
@@ -122,6 +127,7 @@ export function AutopilotPage() {
 
   const titles = useMemo(() => Object.fromEntries((signals ?? []).map((s) => [s.id, signalTitle(s)])), [signals]);
   const activeCount = (signals ?? []).filter((s) => s.active).length;
+  const readyHigh = (leads ?? []).filter((l) => l.ready && l.lead_id !== null && (l.fit ?? 0) >= FIT_HIGH);
 
   const save = async (patch: AutopilotPatch, key: string) => {
     if (!userId) return;
@@ -139,6 +145,23 @@ export function AutopilotPage() {
     setSettings(next);
     setDraft(next);
     if (key === 'filters') setSaved(true);
+  };
+
+  // Phase 2: approve here — the invite goes to the Message Studio queue (sent one at a time by the extension)
+  const queue = async (rows: WarmLead[], key: string) => {
+    if (!userId) return;
+    const ids = rows.map((r) => r.lead_id).filter((x): x is number => typeof x === 'number');
+    if (!ids.length) return;
+    setBusy(key);
+    setActionError(null);
+    const r = await queueLeads(ids, userId);
+    setBusy(null);
+    if (r.error) {
+      setActionError(r.error);
+      return;
+    }
+    setLeads((list) => (list ?? []).map((l) => (l.lead_id !== null && ids.includes(l.lead_id) ? { ...l, send_status: 'queued', ready: false } : l)));
+    forgetReadyCount();
   };
 
   const add = async () => {
@@ -173,12 +196,13 @@ export function AutopilotPage() {
 
   const filtersChanged =
     !!settings &&
-    (['ap_min_engagement', 'ap_max_age_days', 'ap_who', 'ap_posts_per_signal', 'ap_leads_per_run', 'ap_sync_per_run', 'ap_every_hours'] as const).some(
+    (['ap_min_engagement', 'ap_max_age_days', 'ap_who', 'ap_posts_per_signal', 'ap_leads_per_run', 'ap_sync_per_run', 'ap_every_hours', 'ap_headline_include', 'ap_headline_exclude'] as const).some(
       (k) => draft[k] !== settings[k],
     );
-  const outOfRange = (Object.keys(AP_LIMITS) as Array<keyof typeof AP_LIMITS>).some(
-    (k) => !Number.isFinite(draft[k]) || draft[k] < AP_LIMITS[k][0] || draft[k] > AP_LIMITS[k][1],
-  );
+  const autoChanged = !!settings && (draft.ap_auto_min_fit !== settings.ap_auto_min_fit || draft.ap_auto_per_run !== settings.ap_auto_per_run);
+  const bad = (k: keyof typeof AP_LIMITS) => !Number.isFinite(draft[k]) || draft[k] < AP_LIMITS[k][0] || draft[k] > AP_LIMITS[k][1];
+  const outOfRange = (['ap_min_engagement', 'ap_max_age_days', 'ap_posts_per_signal', 'ap_leads_per_run', 'ap_sync_per_run', 'ap_every_hours'] as const).some(bad);
+  const autoOutOfRange = bad('ap_auto_min_fit') || bad('ap_auto_per_run');
 
   const header = (
     <PageHeader
@@ -467,6 +491,34 @@ export function AutopilotPage() {
               </label>
             </div>
           </fieldset>
+          {hasPhase2 ? (
+            <>
+              <label htmlFor="ap-inc" className="flex flex-col gap-1 sm:col-span-2">
+                <span className="label">Only keep people whose headline mentions</span>
+                <input
+                  id="ap-inc"
+                  className="input"
+                  maxLength={300}
+                  placeholder="e.g. founder, CEO, head of, director"
+                  value={draft.ap_headline_include}
+                  onChange={(e) => setDraft({ ...draft, ap_headline_include: e.target.value })}
+                />
+                <span className="text-xs text-slate-500">Separate with commas. Leave empty to keep everyone. People with no visible headline are kept.</span>
+              </label>
+              <label htmlFor="ap-exc" className="flex flex-col gap-1 sm:col-span-2">
+                <span className="label">Skip people whose headline mentions</span>
+                <input
+                  id="ap-exc"
+                  className="input"
+                  maxLength={300}
+                  placeholder="e.g. student, intern, looking for work"
+                  value={draft.ap_headline_exclude}
+                  onChange={(e) => setDraft({ ...draft, ap_headline_exclude: e.target.value })}
+                />
+                <span className="text-xs text-slate-500">Separate with commas. Skipping wins when a headline matches both.</span>
+              </label>
+            </>
+          ) : null}
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
@@ -483,6 +535,7 @@ export function AutopilotPage() {
                   ap_leads_per_run: draft.ap_leads_per_run,
                   ap_sync_per_run: draft.ap_sync_per_run,
                   ap_every_hours: draft.ap_every_hours,
+                  ...(hasPhase2 ? { ap_headline_include: draft.ap_headline_include.trim(), ap_headline_exclude: draft.ap_headline_exclude.trim() } : {}),
                 },
                 'filters',
               )
@@ -495,14 +548,72 @@ export function AutopilotPage() {
         </div>
       </Card>
 
+      {hasPhase2 ? (
+        <Card
+          className="mt-6"
+          title="Send invites by itself (optional)"
+          description="Off by default. When on, after each run the best ready warm leads go to your Message Studio queue as invites."
+        >
+          <label className="flex items-center gap-3 text-sm font-semibold text-slate-900">
+            <input
+              id="ap-auto"
+              type="checkbox"
+              className="h-5 w-5"
+              checked={draft.ap_auto_queue}
+              disabled={busy === 'auto'}
+              onChange={(e) => void save({ ap_auto_queue: e.target.checked }, 'auto')}
+            />
+            {draft.ap_auto_queue ? 'Invites are queued by themselves' : 'I approve every invite myself'}
+          </label>
+          <div className="mt-4 flex flex-wrap items-end gap-5">
+            <NumberField
+              id="ap-fit"
+              label="Only fit score of at least"
+              hint={`40–100. ${FIT_HIGH}+ is High fit.`}
+              value={draft.ap_auto_min_fit}
+              range={AP_LIMITS.ap_auto_min_fit}
+              onChange={(n) => setDraft({ ...draft, ap_auto_min_fit: n })}
+            />
+            <NumberField
+              id="ap-per"
+              label="At most per run"
+              hint="1–50 invites."
+              value={draft.ap_auto_per_run}
+              range={AP_LIMITS.ap_auto_per_run}
+              onChange={(n) => setDraft({ ...draft, ap_auto_per_run: n })}
+            />
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={!autoChanged || autoOutOfRange || busy === 'auto-n'}
+              onClick={() => void save({ ap_auto_min_fit: draft.ap_auto_min_fit, ap_auto_per_run: draft.ap_auto_per_run }, 'auto-n')}
+            >
+              {busy === 'auto-n' ? 'Saving…' : 'Save'}
+            </button>
+            {autoOutOfRange ? <span className="text-xs text-red-700">A number is outside its range.</span> : null}
+          </div>
+          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Queued invites are still sent by the extension one at a time, inside your daily invite limit, working hours and pace. To send them
+            without pressing Start, tick ⚡ in Message Studio on LinkedIn. You can still edit or cancel any queued invite in Message Studio.
+          </p>
+        </Card>
+      ) : null}
+
       <Card
         className="mt-6"
         title="Latest warm leads"
-        description="People Autopilot found, newest first. Their notes appear in Find People once they are synced."
+        description="People Autopilot found, newest first. Once synced they get a fit score and a personal note; queue the ones you like."
         actions={
-          <Link to="/bulk-leads" className="btn-secondary px-3 py-1.5 text-xs">
-            Open People Search
-          </Link>
+          <div className="flex flex-wrap justify-end gap-2">
+            {readyHigh.length ? (
+              <button type="button" className="btn-primary px-3 py-1.5 text-xs" disabled={busy === 'q-all'} onClick={() => void queue(readyHigh, 'q-all')}>
+                {busy === 'q-all' ? 'Queuing…' : `Queue all High fit (${readyHigh.length})`}
+              </button>
+            ) : null}
+            <Link to="/outreach" className="btn-secondary px-3 py-1.5 text-xs">
+              Message Studio
+            </Link>
+          </div>
         }
       >
         {leads.length === 0 ? (
@@ -511,12 +622,13 @@ export function AutopilotPage() {
           </p>
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="py-2 pr-3 font-semibold">Person</th>
                   <th className="py-2 pr-3 font-semibold">How they engaged</th>
-                  <th className="py-2 pr-3 font-semibold">Signal</th>
+                  <th className="py-2 pr-3 font-semibold">Fit</th>
+                  <th className="py-2 pr-3 font-semibold">Personal note</th>
                   <th className="py-2 pr-3 font-semibold">Status</th>
                   <th className="py-2 font-semibold">Found</th>
                 </tr>
@@ -530,25 +642,48 @@ export function AutopilotPage() {
                       : l.engagement_kind === 'repost'
                         ? `Reposted ${l.engagement_author ?? 'a post'}`
                         : `Reacted to ${l.engagement_author ?? 'a post'}`;
+                  const sent = l.send_status === 'sent';
+                  const queuedNow = l.send_status === 'queued' || l.send_status === 'sending';
                   return (
-                    <tr key={l.id} className="border-b border-slate-100 align-top">
-                      <td className="max-w-[16rem] py-3 pr-3">
+                    <tr key={l.search_lead_id} className="border-b border-slate-100 align-top">
+                      <td className="max-w-[14rem] py-3 pr-3">
                         <a href={l.linkedin_url} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline-offset-2 hover:underline">
                           {l.full_name || 'LinkedIn member'}
                         </a>
                         {l.headline ? <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{l.headline}</p> : null}
+                        <p className="mt-1 text-[11px] text-slate-400">{l.signal_id ? titles[l.signal_id] ?? 'Removed signal' : ''}</p>
                       </td>
-                      <td className="max-w-[20rem] py-3 pr-3 text-xs text-slate-700">
+                      <td className="max-w-[16rem] py-3 pr-3 text-xs text-slate-700">
                         {how}
                         {l.engagement_kind === 'comment' && l.engagement_text ? (
                           <p className="mt-0.5 line-clamp-2 italic text-slate-500">“{l.engagement_text}”</p>
                         ) : null}
                       </td>
-                      <td className="py-3 pr-3 text-xs text-slate-600">{l.autopilot_signal_id ? titles[l.autopilot_signal_id] ?? 'Removed' : '–'}</td>
+                      <td className="py-3 pr-3">{l.lead_id ? <FitBadge score={l.fit} emptyLabel="–" /> : <span className="text-xs text-slate-400">–</span>}</td>
+                      <td className="max-w-[20rem] py-3 pr-3 text-xs text-slate-700">
+                        {l.invite_message ? <p className="line-clamp-3">{l.invite_message}</p> : <span className="text-slate-400">{l.lead_id ? 'Writing the note…' : 'After the sync'}</span>}
+                      </td>
                       <td className="py-3 pr-3">
-                        <span className={`pill ${st.cls}`} title={l.status === 'failed' && l.error ? l.error : undefined}>
-                          {st.text}
-                        </span>
+                        {sent ? (
+                          <span className="pill border-emerald-200 bg-emerald-50 text-emerald-800">Invite sent</span>
+                        ) : queuedNow ? (
+                          <span className="pill border-sky-200 bg-sky-50 text-sky-800">Invite queued</span>
+                        ) : l.send_status === 'failed' ? (
+                          <span className="pill border-red-200 bg-red-50 text-red-800">Send failed</span>
+                        ) : l.ready ? (
+                          <button
+                            type="button"
+                            className="btn-primary whitespace-nowrap px-3 py-1 text-xs"
+                            disabled={busy === 'q-' + l.lead_id}
+                            onClick={() => void queue([l], 'q-' + l.lead_id)}
+                          >
+                            {busy === 'q-' + l.lead_id ? 'Queuing…' : 'Queue invite'}
+                          </button>
+                        ) : (
+                          <span className={`pill ${st.cls}`} title={l.status === 'failed' && l.error ? l.error : undefined}>
+                            {l.lead_id && l.status === 'done' ? (l.invite_message ? 'Ready' : 'Note coming') : st.text}
+                          </span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap py-3 text-xs tabular-nums text-slate-500">{formatDateTime(l.created_at)}</td>
                     </tr>

@@ -43,6 +43,13 @@ export interface AutopilotSettings {
   comment_pace: Pace;
   message_pace: Pace;
   sync_pace: Pace;
+  /** Phase 2 (SQL h2): comma-separated words in the headline to keep / to skip. */
+  ap_headline_include: string;
+  ap_headline_exclude: string;
+  /** Phase 3 (SQL h2): queue the best ready warm leads as invites by itself. Off by default. */
+  ap_auto_queue: boolean;
+  ap_auto_min_fit: number;
+  ap_auto_per_run: number;
 }
 export type AutopilotPatch = Partial<Omit<AutopilotSettings, 'ap_last_run_at'>>;
 
@@ -59,6 +66,11 @@ export const AP_DEFAULTS: AutopilotSettings = {
   comment_pace: 'careful',
   message_pace: 'careful',
   sync_pace: 'careful',
+  ap_headline_include: '',
+  ap_headline_exclude: '',
+  ap_auto_queue: false,
+  ap_auto_min_fit: 70,
+  ap_auto_per_run: 10,
 };
 
 /** Allowed ranges (the database refuses anything outside them). */
@@ -69,16 +81,26 @@ export const AP_LIMITS = {
   ap_leads_per_run: [5, 100],
   ap_sync_per_run: [0, 20],
   ap_every_hours: [1, 24],
+  ap_auto_min_fit: [40, 100],
+  ap_auto_per_run: [1, 50],
 } as const;
 
 const SETTINGS_COLUMNS =
   'ap_on, ap_min_engagement, ap_max_age_days, ap_who, ap_posts_per_signal, ap_leads_per_run, ap_sync_per_run, ap_every_hours, ap_last_run_at, comment_pace, message_pace, sync_pace';
 
+const PHASE2_COLUMNS = ', ap_headline_include, ap_headline_exclude, ap_auto_queue, ap_auto_min_fit, ap_auto_per_run';
+/** False when SQL h2 has not been run yet: the page then hides the phase 2/3 controls. */
+export let hasPhase2 = true;
+
 export async function loadAutopilotSettings(userId: string): Promise<Result<AutopilotSettings>> {
   if (!supabase) return notConfigured();
-  const { data, error } = await supabase.from('gab_comment_settings').select(SETTINGS_COLUMNS).eq('user_id', userId).maybeSingle();
-  if (error) return { data: null, error: toFriendlyError(error) };
-  return { data: { ...AP_DEFAULTS, ...((data as Partial<AutopilotSettings> | null) ?? {}) }, error: null };
+  let res = await supabase.from('gab_comment_settings').select(SETTINGS_COLUMNS + (hasPhase2 ? PHASE2_COLUMNS : '')).eq('user_id', userId).maybeSingle();
+  if (res.error && hasPhase2 && isMissingColumn(res.error)) {
+    hasPhase2 = false;
+    res = await supabase.from('gab_comment_settings').select(SETTINGS_COLUMNS).eq('user_id', userId).maybeSingle();
+  }
+  if (res.error) return { data: null, error: toFriendlyError(res.error) };
+  return { data: { ...AP_DEFAULTS, ...((res.data as Partial<AutopilotSettings> | null) ?? {}) }, error: null };
 }
 
 export async function saveAutopilotSettings(userId: string, clientId: string | null, patch: AutopilotPatch): Promise<FriendlyError | null> {
@@ -221,4 +243,81 @@ export async function loadAutopilotLeads(limit = 100): Promise<Result<AutopilotL
     .limit(limit);
   if (error) return { data: null, error: toFriendlyError(error) };
   return { data: (data ?? []) as AutopilotLead[], error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 (SQL h2): the people with their lead once synced — fit, note, send status
+// ---------------------------------------------------------------------------
+export interface WarmLead {
+  search_lead_id: number;
+  linkedin_url: string;
+  full_name: string | null;
+  headline: string | null;
+  status: AutopilotLead['status'];
+  error: string | null;
+  engagement_kind: AutopilotLead['engagement_kind'];
+  engagement_text: string | null;
+  engagement_author: string | null;
+  signal_id: number | null;
+  created_at: string;
+  lead_id: number | null;
+  fit: number | null;
+  invite_message: string | null;
+  send_status: string | null;
+  connection_status: string | null;
+  /** Synced, has a note, not queued or sent yet. */
+  ready: boolean;
+}
+
+function fromOldRow(l: AutopilotLead): WarmLead {
+  return {
+    search_lead_id: l.id, linkedin_url: l.linkedin_url, full_name: l.full_name, headline: l.headline, status: l.status, error: l.error,
+    engagement_kind: l.engagement_kind, engagement_text: l.engagement_text, engagement_author: l.engagement_author,
+    signal_id: l.autopilot_signal_id, created_at: l.created_at, lead_id: null, fit: null, invite_message: null,
+    send_status: null, connection_status: null, ready: false,
+  };
+}
+
+/** The latest people Autopilot found. Uses the phase 2 function when it exists. */
+export async function loadWarmLeads(limit = 100): Promise<Result<WarmLead[]>> {
+  if (!supabase) return notConfigured();
+  if (hasPhase2) {
+    const { data, error } = await supabase.rpc('gab_ap_warm_leads', { p_limit: limit });
+    if (!error) {
+      return {
+        data: ((data ?? []) as WarmLead[]).map((r) => ({ ...r, fit: r.fit === null || r.fit === undefined ? null : Number(r.fit) })),
+        error: null,
+      };
+    }
+    if (!isMissingAutopilot(error)) return { data: null, error: toFriendlyError(error) };
+    hasPhase2 = false;
+  }
+  const old = await loadAutopilotLeads(limit);
+  if (old.error) return { data: null, error: old.error };
+  return { data: old.data.map(fromOldRow), error: null };
+}
+
+/** How many warm leads wait for approval (Today, the bell). 0 when phase 2 is not set up. */
+let readyCache: { at: number; value: number } | null = null;
+let readyInFlight: Promise<number> | null = null;
+export const AP_READY_CHANGED = 'gab-ap-ready-changed';
+export function loadReadyCount(force = false): Promise<number> {
+  const client = supabase;
+  if (!client || !hasPhase2) return Promise.resolve(0);
+  if (!force && readyCache && Date.now() - readyCache.at < 60000) return Promise.resolve(readyCache.value);
+  if (readyInFlight) return readyInFlight;
+  readyInFlight = (async () => {
+    const { data, error } = await client.rpc('gab_ap_ready_count_me');
+    if (error && isMissingAutopilot(error)) hasPhase2 = false;
+    const value = error ? 0 : Number(data) || 0;
+    readyCache = { at: Date.now(), value };
+    return value;
+  })().finally(() => {
+    readyInFlight = null;
+  });
+  return readyInFlight;
+}
+export function forgetReadyCount() {
+  readyCache = null;
+  window.dispatchEvent(new Event(AP_READY_CHANGED));
 }
