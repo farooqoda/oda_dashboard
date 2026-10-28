@@ -14,6 +14,7 @@ const NAV = [
   { to: '/bulk-leads', label: 'People Search', end: false },
   { to: '/outreach', label: 'Message Studio', end: false },
   { to: '/posts', label: 'Conversations', end: false },
+  { to: '/autopilot', label: 'Autopilot', end: false },
   { to: '/comments', label: 'Comments', end: false },
   { to: '/publish', label: 'Publish', end: false },
   { to: '/prompts', label: 'Prompts', end: false },
@@ -111,7 +112,7 @@ export function TopBar() {
   const nav = manager ? [...NAV, { to: '/team', label: 'Team', end: false }] : NAV;
 
   const pill = ({ isActive }: { isActive: boolean }) =>
-    `whitespace-nowrap rounded-full px-2.5 py-2 text-sm transition-colors 2xl:px-3.5 ${
+    `whitespace-nowrap rounded-full px-2.5 py-2 text-sm transition-colors min-[1700px]:px-3.5 ${
       isActive ? 'bg-ink font-semibold text-white shadow-sm' : 'font-medium text-slate-700 hover:bg-sun-50 hover:text-ink'
     }`;
 
@@ -123,7 +124,7 @@ export function TopBar() {
           <BrandLogo />
         </Link>
 
-        <nav aria-label="Main" className="mx-auto hidden rounded-full border border-slate-200/80 bg-white/80 p-1 shadow-sm xl:flex">
+        <nav aria-label="Main" className="mx-auto hidden rounded-full border border-slate-200/80 bg-white/80 p-1 shadow-sm 2xl:flex">
           {nav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={pill}>
               {item.label}
@@ -131,13 +132,13 @@ export function TopBar() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 xl:ml-0">
+        <div className="ml-auto flex items-center gap-2 2xl:ml-0">
           <ExtensionPill />
           <ThemeToggle />
           <Bell />
           <button
             type="button"
-            className="inline-flex h-11 items-center rounded-full bg-white/70 px-4 text-sm font-medium text-slate-800 xl:hidden"
+            className="inline-flex h-11 items-center rounded-full bg-white/70 px-4 text-sm font-medium text-slate-800 2xl:hidden"
             onClick={() => setMenuOpen((v) => !v)}
             aria-expanded={menuOpen}
           >
@@ -148,7 +149,7 @@ export function TopBar() {
       </div>
 
       {menuOpen ? (
-        <nav aria-label="Main" className="mt-3 grid grid-cols-2 gap-1 rounded-3xl bg-white/80 p-2 sm:grid-cols-3 xl:hidden">
+        <nav aria-label="Main" className="mt-3 grid grid-cols-2 gap-1 rounded-3xl bg-white/80 p-2 sm:grid-cols-3 2xl:hidden">
           {[...nav, { to: '/settings', label: 'Settings', end: false }].map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={pill}>
               {item.label}
