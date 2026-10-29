@@ -142,3 +142,11 @@ html.dark .hatched {
   background: repeating-linear-gradient(135deg, #131d2e 0 6px, #223049 6px 8px);
   border-color: #223049;
 }
+
+/* I3: client reports print cleanly (Print / Save as PDF) */
+@media print {
+  body { background: #fff !important; }
+  main { padding-top: 0 !important; }
+  .card { box-shadow: none !important; break-inside: avoid; }
+  @page { margin: 14mm; }
+}

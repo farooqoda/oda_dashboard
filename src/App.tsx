@@ -25,6 +25,9 @@ import { ManageTeamsPage } from './pages/ManageTeamsPage';
 import { WebsiteChatPage } from './pages/WebsiteChatPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { SendersPage } from './pages/SendersPage';
+import { AgencyPage } from './pages/AgencyPage';
+import { AgencyBoxPage } from './pages/AgencyBoxPage';
+import { ClientReportPage } from './pages/ClientReportPage';
 
 function Shell() {
   return (
@@ -49,6 +52,9 @@ function Shell() {
             <Route path="/team/website-chat" element={<WebsiteChatPage />} />
             <Route path="/team/customers" element={<CustomersPage />} />
             <Route path="/team/senders" element={<SendersPage />} />
+            <Route path="/agency" element={<AgencyPage />} />
+            <Route path="/agency/report/:clientId" element={<ClientReportPage />} />
+            <Route path="/agency/box" element={<AgencyBoxPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
