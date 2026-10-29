@@ -172,6 +172,237 @@ function MemberTable({ rows }: { rows: ActivityRow[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Details for the members chosen in the list (all of them, a few, or one)
+// ---------------------------------------------------------------------------
+function TeamDetails({
+  rows,
+  daily,
+  admin,
+  client,
+  showChart,
+  showLimits,
+}: {
+  rows: ActivityRow[];
+  daily: DailyRow[];
+  admin: boolean;
+  client: string;
+  showChart: boolean;
+  showLimits: boolean;
+}) {
+  const total = sum(rows);
+  const byClient = new Map<string, ActivityRow[]>();
+  for (const r of rows) byClient.set(r.client_id, [...(byClient.get(r.client_id) ?? []), r]);
+  const chart = bucket(daily);
+  return (
+    <>
+          <section aria-label="Totals" className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="card col-span-2 bg-ink p-4 text-white sm:col-span-1">
+              <p className="text-xs text-white/70">Time saved (estimate)</p>
+              <p className="text-3xl font-semibold tabular-nums">{hours(minutesSaved(total))}</p>
+              <p className="mt-1 text-[11px] text-white/60">{rows.length} {rows.length === 1 ? 'member' : 'members'}{admin && !client && byClient.size > 1 ? ` · ${byClient.size} clients` : ''}</p>
+            </div>
+            {NUM.map((n) => (
+              <div key={n.key} className="card p-3" title={n.title}>
+                <p className="text-xs text-slate-500">{n.label}</p>
+                <p className="text-2xl font-semibold tabular-nums text-slate-900">{total[n.key] ?? 0}</p>
+              </div>
+            ))}
+          </section>
+          <section aria-label="Rates" className="mb-6 grid gap-3 sm:grid-cols-3">
+            <div className="card p-3">
+              <p className="text-xs text-slate-500">Acceptance rate</p>
+              <p className="text-xl font-semibold tabular-nums">{pct(total.accepted, total.invites)}</p>
+              <p className="text-[11px] text-slate-500">accepted ÷ invites in this period</p>
+            </div>
+            <div className="card p-3">
+              <p className="text-xs text-slate-500">Reply rate</p>
+              <p className="text-xl font-semibold tabular-nums">{pct(total.replies, total.messages + total.accepted)}</p>
+              <p className="text-[11px] text-slate-500">replies ÷ (messages + accepted invites)</p>
+            </div>
+            <div className="card p-3">
+              <p className="text-xs text-slate-500">Needs attention now</p>
+              <p className="text-xl font-semibold tabular-nums">{(total.failed ?? 0) + (total.to_approve ?? 0)}</p>
+              <p className="text-[11px] text-slate-500">
+                {total.failed ?? 0} failed · {total.to_approve ?? 0} to approve · {total.queued ?? 0} queued
+              </p>
+            </div>
+          </section>
+
+          {showChart ? (
+          <div className="mb-6">
+            <ChartCard
+              title="Work done per day"
+              description="Profiles saved, invites, messages, follow-ups and comments (by day, week or month, depending on the range)"
+              columns={['Day', 'Actions']}
+              rows={chart}
+              emptyMessage="Nothing was done in this period."
+            >
+              {(w) => <ColumnChart data={chart} width={w} unit="actions" />}
+            </ChartCard>
+          </div>
+          ) : null}
+
+          {[...byClient.entries()].map(([cid, members]) => {
+            const t = sum(members);
+            return (
+              <section key={cid} className="card mb-6" aria-label={`${cid} team`}>
+                <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 px-4 py-3">
+                  <h2 className="text-base font-semibold text-slate-900">
+                    {cid} <span className="text-sm font-normal text-slate-500">· {members.length} {members.length === 1 ? 'member' : 'members'}</span>
+                  </h2>
+                  <p className="text-xs text-slate-600">
+                    {t.invites} invites · {t.messages} messages · {t.followups} follow-ups · {t.replies} replies · <b>{hours(minutesSaved(t))} saved</b>
+                  </p>
+                </header>
+                <MemberTable rows={members} />
+              </section>
+            );
+          })}
+          {showLimits ? <MemberLimitsCard client={client} /> : null}
+          <p className="text-xs text-slate-500">
+            Counts are people, not messages (someone who got two follow-ups counts once). “Status now”, failed, queued and “to approve”
+            are right now; everything else is for the dates chosen. Time saved assumes by hand: 3 min a profile, 2 an invite, 3 a
+            message or follow-up, 4 a comment or reply, 1 a search result or post, 30 s an engager.
+          </p>
+    </>
+  );
+}
+
+const memberKey = (m: ActivityRow) => m.client_id + '|' + m.user_id;
+
+// ---------------------------------------------------------------------------
+// The list shown first: one line per member
+// ---------------------------------------------------------------------------
+function MembersList({
+  rows,
+  admin,
+  onOpen,
+  onCombine,
+}: {
+  rows: ActivityRow[];
+  admin: boolean;
+  onOpen: (key: string) => void;
+  onCombine: (keys: string[] | null) => void;
+}) {
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState('');
+  const shown = rows.filter((m) => {
+    const q = filter.trim().toLowerCase();
+    return !q || (m.email ?? m.user_id).toLowerCase().includes(q) || m.client_id.toLowerCase().includes(q);
+  });
+  const toggle = (k: string) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
+  const allShownPicked = shown.length > 0 && shown.every((m) => picked.has(memberKey(m)));
+  return (
+    <section className="card mb-6" aria-label="Team members">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">
+            Team members <span className="text-sm font-normal text-slate-500">· {rows.length}</span>
+          </h2>
+          <p className="text-xs text-slate-500">Open one person, or tick a few and see them together.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            id="team-filter"
+            className="input w-48 py-1.5 text-sm"
+            placeholder="Find a member"
+            aria-label="Find a member"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <button type="button" className="btn-secondary" disabled={picked.size === 0} onClick={() => onCombine([...picked])}>
+            See selected together{picked.size ? ` (${picked.size})` : ''}
+          </button>
+          <button type="button" className="btn-primary" onClick={() => onCombine(null)}>
+            See everyone together
+          </button>
+        </div>
+      </header>
+      <div className="relative overflow-x-auto">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+              <th className="w-10 px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label="Select everyone shown"
+                  checked={allShownPicked}
+                  onChange={() =>
+                    setPicked((p) => {
+                      const n = new Set(p);
+                      for (const m of shown) {
+                        if (allShownPicked) n.delete(memberKey(m));
+                        else n.add(memberKey(m));
+                      }
+                      return n;
+                    })
+                  }
+                />
+              </th>
+              <th className="px-2 py-3 font-medium">Member</th>
+              {admin ? <th className="px-2 py-3 font-medium">Client</th> : null}
+              <th className="px-2 py-3 text-right font-medium">Invites</th>
+              <th className="px-2 py-3 text-right font-medium">Replies</th>
+              <th className="px-2 py-3 text-right font-medium">Saved</th>
+              <th className="px-2 py-3 font-medium">Status now</th>
+              <th className="px-4 py-3">
+                <span className="sr-only">Open</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((m) => {
+              const k = memberKey(m);
+              return (
+                <tr key={k} className="border-b border-slate-100 align-top last:border-0">
+                  <td className="px-4 py-3">
+                    <input type="checkbox" aria-label={`Select ${m.email ?? m.user_id}`} checked={picked.has(k)} onChange={() => toggle(k)} />
+                  </td>
+                  <td className="px-2 py-3">
+                    <button type="button" className="text-left font-semibold text-slate-900 underline-offset-2 hover:underline" onClick={() => onOpen(k)}>
+                      {m.email ?? m.user_id}
+                    </button>
+                    <p className="text-xs text-slate-500">
+                      {m.last_activity_at ? `Last send ${formatDateTime(m.last_activity_at)}` : 'Nothing sent yet'}
+                      {m.ext_version ? ` · v${m.ext_version}` : ''}
+                    </p>
+                  </td>
+                  {admin ? <td className="px-2 py-3 text-xs text-slate-600">{m.client_id}</td> : null}
+                  <td className="px-2 py-3 text-right tabular-nums">{Number(m.invites) || 0}</td>
+                  <td className="px-2 py-3 text-right tabular-nums">{Number(m.replies) || 0}</td>
+                  <td className="px-2 py-3 text-right tabular-nums">{hours(minutesSaved(m))}</td>
+                  <td className="px-2 py-3">
+                    <Pills items={health(m)} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button type="button" className="btn-secondary px-3 py-1 text-xs" onClick={() => onOpen(k)}>
+                      Details
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {shown.length === 0 ? (
+              <tr>
+                <td colSpan={admin ? 8 : 7} className="px-4 py-6 text-center text-sm text-slate-500">
+                  Nobody matches “{filter}”.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 export function TeamPage() {
@@ -186,6 +417,8 @@ export function TeamPage() {
   const [rows, setRows] = useState<ActivityRow[] | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [error, setError] = useState<FriendlyError | null>(null);
+  // v-next: the page opens on the list of members; details for one, a few, or everyone
+  const [view, setView] = useState<{ mode: 'list' | 'all' | 'some' | 'one'; keys: string[] }>({ mode: 'list', keys: [] });
 
   useEffect(() => {
     void loadReportClients().then((r) => {
@@ -210,10 +443,8 @@ export function TeamPage() {
 
   if (legacy) return <LegacyTeamPage />;
 
-  const total = sum(rows ?? []);
-  const byClient = new Map<string, ActivityRow[]>();
-  for (const r of rows ?? []) byClient.set(r.client_id, [...(byClient.get(r.client_id) ?? []), r]);
-  const chart = bucket(daily);
+  const keys = new Set(view.keys);
+  const shownRows = (rows ?? []).filter((m) => view.mode === 'all' || keys.has(memberKey(m)));
   const badRange = !from || !to || to < from;
 
   return (
@@ -223,6 +454,9 @@ export function TeamPage() {
         actions={
           admin ? (
             <div className="flex flex-wrap gap-2">
+              <Link to="/team/customers" className="btn-secondary">
+                Customers
+              </Link>
               <Link to="/team/website-chat" className="btn-secondary">
                 Website chat
               </Link>
@@ -312,75 +546,36 @@ export function TeamPage() {
           {manager ? 'Members appear here once they join.' : 'Ask your administrator to make you a manager to see your team’s activity.'}
         </EmptyState>
       ) : (
-        <>
-          <section aria-label="Totals" className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <div className="card col-span-2 bg-ink p-4 text-white sm:col-span-1">
-              <p className="text-xs text-white/70">Time saved (estimate)</p>
-              <p className="text-3xl font-semibold tabular-nums">{hours(minutesSaved(total))}</p>
-              <p className="mt-1 text-[11px] text-white/60">{rows.length} members{admin && !client ? ` · ${byClient.size} clients` : ''}</p>
-            </div>
-            {NUM.map((n) => (
-              <div key={n.key} className="card p-3" title={n.title}>
-                <p className="text-xs text-slate-500">{n.label}</p>
-                <p className="text-2xl font-semibold tabular-nums text-slate-900">{total[n.key] ?? 0}</p>
-              </div>
-            ))}
-          </section>
-          <section aria-label="Rates" className="mb-6 grid gap-3 sm:grid-cols-3">
-            <div className="card p-3">
-              <p className="text-xs text-slate-500">Acceptance rate</p>
-              <p className="text-xl font-semibold tabular-nums">{pct(total.accepted, total.invites)}</p>
-              <p className="text-[11px] text-slate-500">accepted ÷ invites in this period</p>
-            </div>
-            <div className="card p-3">
-              <p className="text-xs text-slate-500">Reply rate</p>
-              <p className="text-xl font-semibold tabular-nums">{pct(total.replies, total.messages + total.accepted)}</p>
-              <p className="text-[11px] text-slate-500">replies ÷ (messages + accepted invites)</p>
-            </div>
-            <div className="card p-3">
-              <p className="text-xs text-slate-500">Needs attention now</p>
-              <p className="text-xl font-semibold tabular-nums">{(total.failed ?? 0) + (total.to_approve ?? 0)}</p>
-              <p className="text-[11px] text-slate-500">
-                {total.failed ?? 0} failed · {total.to_approve ?? 0} to approve · {total.queued ?? 0} queued
+        view.mode === 'list' ? (
+          <>
+            <MembersList
+              rows={rows}
+              admin={admin}
+              onOpen={(k) => setView({ mode: 'one', keys: [k] })}
+              onCombine={(keys) => setView(keys ? { mode: 'some', keys } : { mode: 'all', keys: [] })}
+            />
+            <p className="text-xs text-slate-500">Numbers are for the dates chosen above; “Status now” is right now.</p>
+          </>
+        ) : (
+          <>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <button type="button" className="btn-secondary" onClick={() => setView({ mode: 'list', keys: [] })}>
+                ← Back to the list
+              </button>
+              <p className="text-sm font-semibold text-slate-900">
+                {view.mode === 'all'
+                  ? 'Everyone together'
+                  : view.mode === 'one'
+                    ? (shownRows[0]?.email ?? shownRows[0]?.user_id ?? 'Member')
+                    : `${shownRows.length} selected members together`}
               </p>
             </div>
-          </section>
-
-          <div className="mb-6">
-            <ChartCard
-              title="Work done per day"
-              description="Profiles saved, invites, messages, follow-ups and comments (by day, week or month, depending on the range)"
-              columns={['Day', 'Actions']}
-              rows={chart}
-              emptyMessage="Nothing was done in this period."
-            >
-              {(w) => <ColumnChart data={chart} width={w} unit="actions" />}
-            </ChartCard>
-          </div>
-
-          {[...byClient.entries()].map(([cid, members]) => {
-            const t = sum(members);
-            return (
-              <section key={cid} className="card mb-6" aria-label={`${cid} team`}>
-                <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 px-4 py-3">
-                  <h2 className="text-base font-semibold text-slate-900">
-                    {cid} <span className="text-sm font-normal text-slate-500">· {members.length} {members.length === 1 ? 'member' : 'members'}</span>
-                  </h2>
-                  <p className="text-xs text-slate-600">
-                    {t.invites} invites · {t.messages} messages · {t.followups} follow-ups · {t.replies} replies · <b>{hours(minutesSaved(t))} saved</b>
-                  </p>
-                </header>
-                <MemberTable rows={members} />
-              </section>
-            );
-          })}
-          <MemberLimitsCard client={client} />
-          <p className="text-xs text-slate-500">
-            Counts are people, not messages (someone who got two follow-ups counts once). “Status now”, failed, queued and “to approve”
-            are right now; everything else is for the dates chosen. Time saved assumes by hand: 3 min a profile, 2 an invite, 3 a
-            message or follow-up, 4 a comment or reply, 1 a search result or post, 30 s an engager.
-          </p>
-        </>
+            {view.mode !== 'all' ? (
+              <p className="mb-4 text-xs text-slate-500">The day-by-day chart and member limits are on the “Everyone together” view.</p>
+            ) : null}
+            <TeamDetails rows={shownRows} daily={daily} admin={admin} client={client} showChart={view.mode === 'all'} showLimits={view.mode === 'all'} />
+          </>
+        )
       )}
     </>
   );
