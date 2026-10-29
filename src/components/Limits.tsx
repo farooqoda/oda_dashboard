@@ -190,7 +190,7 @@ export function MemberLimitsCard({ client }: { client: string }) {
             should stay lower (warm-up in the member’s Settings raises invites slowly). Invites start again at midnight in each
             member’s own time zone (their Settings);{' '}
             {hourly
-              ? 'so do comments, with at most the hourly number in any 60 minutes (a run waits by itself when it reaches it).'
+              ? 'so do comments. “Comments an hour” is the same as the daily number unless you lower it; a lower number spreads comments out (a run waits by itself when it reaches it).'
               : 'comments count over the last 24 hours.'}
           </p>
         </div>
@@ -247,7 +247,7 @@ export function MyLimitsCard() {
           </p>
           <p className="mt-1 text-xs text-slate-600">
             {typeof me.comment_hourly_limit === 'number'
-              ? `Starts again at ${resetText(me.tz)} · at most ${me.comment_hourly_limit} an hour.`
+              ? `Starts again at ${resetText(me.tz)}${me.comment_hourly_limit < me.comment_limit ? ` · at most ${me.comment_hourly_limit} an hour` : ''}.`
               : 'Counted over the last 24 hours.'}
           </p>
         </div>
