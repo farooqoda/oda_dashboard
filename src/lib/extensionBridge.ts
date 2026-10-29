@@ -87,3 +87,12 @@ export function useExtensionTask() {
 
   return { status, task, version, pending, refused, chooseTask, recheck };
 }
+
+/** v4.33: wake Autopilot on LinkedIn at once (settings saved / Run now). Older extensions ignore it. */
+export function kickAutopilot() {
+  try {
+    window.postMessage({ source: 'gab-dashboard', type: 'ap-kick' }, window.location.origin);
+  } catch {
+    /* ignore */
+  }
+}

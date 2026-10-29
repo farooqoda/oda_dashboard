@@ -12,6 +12,10 @@ import {
   hasPhase2,
   loadWarmLeads,
   loadAutopilotSettings,
+  loadAutopilotStatus,
+  requestRunNow,
+  statusText,
+  type AutopilotStatus,
   loadSignalStats,
   loadSignals,
   saveAutopilotSettings,
@@ -27,11 +31,12 @@ import {
 } from '../lib/autopilot';
 import { FIT_HIGH } from '../lib/constants';
 import { queueLeads } from '../lib/messages';
-import { useExtensionTask } from '../lib/extensionBridge';
+import { kickAutopilot, useExtensionTask } from '../lib/extensionBridge';
 import { formatDateTime } from '../lib/format';
 import type { FriendlyError } from '../lib/supabase';
 
 const MIN_EXTENSION = [4, 32, 0];
+const RUN_NOW_EXTENSION = [4, 33, 0];
 function olderThan(version: string | null, min: number[]): boolean {
   if (!version) return false;
   const v = version.split('.').map((n) => Number(n) || 0);
@@ -83,6 +88,104 @@ function NumberField({
   );
 }
 
+const TONE_CLS = {
+  good: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  warn: 'border-amber-200 bg-amber-50 text-amber-900',
+  bad: 'border-red-200 bg-red-50 text-red-900',
+  info: 'border-sky-200 bg-sky-50 text-sky-900',
+} as const;
+const ago = (iso: string | null) => {
+  if (!iso) return null;
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  if (m < 48 * 60) return `${Math.round(m / 60)} h ago`;
+  return `${Math.round(m / 1440)} days ago`;
+};
+const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** H3: is Autopilot running, and if not, why — plus Run now. */
+function StatusCard({ status, on, activeCount, version, onRunNow, runMsg, busy }: {
+  status: AutopilotStatus;
+  on: boolean;
+  activeCount: number;
+  version: string | null;
+  onRunNow: () => void;
+  runMsg: string | null;
+  busy: boolean;
+}) {
+  const st = statusText(status);
+  const extOk = version ? !olderThan(version, RUN_NOW_EXTENSION) : !!status.ext_version && !olderThan(status.ext_version, RUN_NOW_EXTENSION);
+  const seenRecently = !!status.ext_seen_at && Date.now() - new Date(status.ext_seen_at).getTime() < 60 * 60 * 1000;
+  const hours = status.schedule_on
+    ? `${(status.work_days ?? [1, 2, 3, 4, 5]).map((d) => DAY_NAMES[d]).join(', ')} ${status.work_start ?? ''}–${status.work_end ?? ''}${status.work_tz ? ` (${status.work_tz})` : ''}`
+    : 'any time (no working hours set)';
+  const checks: { ok: boolean; text: string; hint?: string }[] = [
+    { ok: on, text: 'Autopilot is switched on', hint: 'Switch it on below (Run now works even when it is off).' },
+    { ok: activeCount > 0, text: `${activeCount} active ${activeCount === 1 ? 'keyword or creator' : 'keywords / creators'}`, hint: 'Add at least one below.' },
+    {
+      ok: extOk,
+      text: `Extension 4.33 or newer${version || status.ext_version ? ` (yours: ${version ?? status.ext_version})` : ''}`,
+      hint: 'Update in chrome://extensions (Developer mode → Update), or wait for Chrome to update it.',
+    },
+    {
+      ok: seenRecently,
+      text: `LinkedIn open in Chrome${status.ext_seen_at ? ` (extension last seen ${ago(status.ext_seen_at)})` : ''}`,
+      hint: 'Autopilot only works while a LinkedIn tab is open in Chrome on a computer that is awake. The tab can be in the background.',
+    },
+    { ok: !status.paused_until, text: status.paused_until ? `Paused until ${formatDateTime(status.paused_until)} (LinkedIn warning)` : 'Not paused by a LinkedIn warning' },
+  ];
+  return (
+    <section className="card mb-6 p-5" aria-label="Autopilot status">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-bold text-ink">Is Autopilot working?</h2>
+          <p className={`mt-2 rounded-lg border px-3 py-2 text-sm ${TONE_CLS[st.tone]}`} role="status">
+            {st.text}
+            {status.status_at ? <span className="ml-1 text-xs opacity-75">({ago(status.status_at)})</span> : null}
+          </p>
+          <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-600">
+            <div>
+              <dt className="inline">Last run: </dt>
+              <dd className="inline font-semibold text-slate-800">{status.last_run_at ? formatDateTime(status.last_run_at) : 'not yet'}</dd>
+            </div>
+            <div>
+              <dt className="inline">Next signal due: </dt>
+              <dd className="inline font-semibold text-slate-800">
+                {status.next_due_at ? (new Date(status.next_due_at).getTime() <= Date.now() + 60000 ? 'now' : formatDateTime(status.next_due_at)) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="inline">Working hours: </dt>
+              <dd className="inline font-semibold text-slate-800">{hours}</dd>
+            </div>
+          </dl>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <button type="button" id="ap-run-now" className="btn-primary" disabled={busy || activeCount === 0 || !!status.paused_until || status.run_now_pending} onClick={onRunNow}>
+            {status.run_now_pending ? 'Run requested…' : 'Run now'}
+          </button>
+          <p className="max-w-[260px] text-right text-xs text-slate-500">One run at once, even outside working hours. It opens in a new LinkedIn tab so you can watch.</p>
+        </div>
+      </div>
+      {runMsg ? <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{runMsg}</p> : null}
+      <ul className="mt-4 grid gap-1.5 sm:grid-cols-2" aria-label="What Autopilot needs">
+        {checks.map((c) => (
+          <li key={c.text} className="flex gap-2 text-sm">
+            <span aria-hidden="true" className={c.ok ? 'text-emerald-600' : 'text-amber-600'}>
+              {c.ok ? '✓' : '!'}
+            </span>
+            <span className={c.ok ? 'text-slate-700' : 'text-slate-900'}>
+              {c.text}
+              {!c.ok && c.hint ? <span className="block text-xs text-slate-500">{c.hint}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function AutopilotPage() {
   const { user, clientId } = useAuth();
   const userId = user?.id ?? null;
@@ -102,6 +205,8 @@ export function AutopilotPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<FriendlyError | null>(null);
   const [saved, setSaved] = useState(false);
+  const [status, setStatus] = useState<AutopilotStatus | null>(null);
+  const [runMsg, setRunMsg] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!userId) return;
@@ -125,6 +230,38 @@ export function AutopilotPage() {
     void reload();
   }, [reload]);
 
+  // H3: what the extension last said (refreshes every 20 s while the page is open)
+  const loadStatus = useCallback(async () => {
+    const r = await loadAutopilotStatus();
+    setStatus(r.data);
+  }, []);
+  useEffect(() => {
+    void loadStatus();
+    const t = window.setInterval(() => void loadStatus(), 20000);
+    return () => window.clearInterval(t);
+  }, [loadStatus]);
+
+  const runNow = async () => {
+    setBusy('run');
+    setRunMsg(null);
+    const r = await requestRunNow();
+    setBusy(null);
+    if (!r.ok) {
+      const why: Record<string, string> = {
+        no_signals: 'Add at least one keyword or creator first.',
+        paused: 'Autopilot is paused for 24 hours after a LinkedIn warning.',
+        plan: 'Autopilot is not included in the Starter plan.',
+      };
+      setRunMsg(why[r.reason ?? ''] ?? `Could not ask for a run (${r.reason ?? 'error'}).`);
+      return;
+    }
+    kickAutopilot();
+    setRunMsg(
+      'Asked. If LinkedIn is open in this Chrome, a new LinkedIn tab opens within a few seconds and works for a few minutes, then closes. If LinkedIn is open on another computer, it starts there within 5 minutes.',
+    );
+    void loadStatus();
+  };
+
   const titles = useMemo(() => Object.fromEntries((signals ?? []).map((s) => [s.id, signalTitle(s)])), [signals]);
   const activeCount = (signals ?? []).filter((s) => s.active).length;
   const readyHigh = (leads ?? []).filter((l) => l.ready && l.lead_id !== null && (l.fit ?? 0) >= FIT_HIGH);
@@ -144,6 +281,8 @@ export function AutopilotPage() {
     const next = { ...(settings ?? AP_DEFAULTS), ...patch } as AutopilotSettings;
     setSettings(next);
     setDraft(next);
+    kickAutopilot();   // v4.33: LinkedIn picks up the new settings at once
+    void loadStatus();
     if (key === 'filters') setSaved(true);
   };
 
@@ -245,9 +384,13 @@ export function AutopilotPage() {
 
       {olderThan(version, MIN_EXTENSION) ? (
         <div role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Your extension is version {version}. Autopilot needs version 4.32 or newer. Chrome updates it by itself within a few hours; to update now,
+          Your extension is version {version}. Autopilot needs version 4.32 or newer (4.33 for Run now and the status below). Chrome updates it by itself within a few hours; to update now,
           open <span className="font-mono">chrome://extensions</span>, switch on Developer mode and press Update.
         </div>
+      ) : null}
+
+      {status ? (
+        <StatusCard status={status} on={draft.ap_on} activeCount={activeCount} version={version} onRunNow={() => void runNow()} runMsg={runMsg} busy={busy === 'run'} />
       ) : null}
 
       {actionError ? (
@@ -260,7 +403,7 @@ export function AutopilotPage() {
         <Card
           className="min-w-0 lg:col-span-1"
           title="Autopilot"
-          description="Runs in a background tab while LinkedIn is open in Chrome, inside your working hours."
+          description="Runs by itself in a background tab while LinkedIn is open in Chrome, inside your working hours. There is no Start button: switch it on, or press Run now above."
         >
           <label className="flex items-center gap-3 text-sm font-semibold text-slate-900">
             <input

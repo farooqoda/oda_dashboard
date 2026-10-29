@@ -321,3 +321,78 @@ export function forgetReadyCount() {
   readyCache = null;
   window.dispatchEvent(new Event(AP_READY_CHANGED));
 }
+
+// ---------------------------------------------------------------------------
+// H3: Run now + what Autopilot is doing (extension 4.33)
+// ---------------------------------------------------------------------------
+export interface AutopilotStatus {
+  on: boolean;
+  signals: number;
+  status: 'waiting' | 'running' | 'done' | 'failed' | 'error' | null;
+  detail: string | null;
+  status_at: string | null;
+  last_run_at: string | null;
+  next_due_at: string | null;
+  run_now_pending: boolean;
+  run_now_at: string | null;
+  ext_seen_at: string | null;
+  ext_version: string | null;
+  paused_until: string | null;
+  schedule_on: boolean;
+  work_days: number[] | null;
+  work_start: string | null;
+  work_end: string | null;
+  work_tz: string | null;
+}
+
+/** null data + missing = the H3 SQL has not been run yet (the page then hides the status card). */
+export async function loadAutopilotStatus(): Promise<{ data: AutopilotStatus | null; missing: boolean }> {
+  if (!supabase) return { data: null, missing: true };
+  const { data, error } = await supabase.rpc('gab_ap_status_me');
+  if (error) return { data: null, missing: true };
+  return { data: (data as AutopilotStatus) ?? null, missing: false };
+}
+
+export async function requestRunNow(): Promise<{ ok: boolean; reason?: string }> {
+  if (!supabase) return { ok: false, reason: 'not_configured' };
+  const { data, error } = await supabase.rpc('gab_ap_run_now');
+  if (error) return { ok: false, reason: error.message };
+  return (data as { ok: boolean; reason?: string }) ?? { ok: false };
+}
+
+/** What the extension last said, in plain words. */
+export function statusText(s: Pick<AutopilotStatus, 'status' | 'detail'>): { text: string; tone: 'good' | 'warn' | 'bad' | 'info' } {
+  const d = s.detail ?? '';
+  switch (s.status) {
+    case 'running':
+      return { text: `Running now: looking at “${d}”.`, tone: 'info' };
+    case 'done':
+      return { text: `Last run finished: ${d}.`, tone: 'good' };
+    case 'failed':
+      return {
+        text:
+          d === 'warning'
+            ? 'Last run stopped: LinkedIn showed a security check. Automatic runs pause for 24 hours.'
+            : d === 'timeout'
+              ? 'Last run took too long and was stopped (was the computer asleep?).'
+              : `Last run stopped (${d}).`,
+        tone: 'bad',
+      };
+    case 'error':
+      return { text: `The extension could not reach the server (${d}). It tries again in 5 minutes.`, tone: 'bad' };
+    case 'waiting': {
+      const why: Record<string, string> = {
+        off: 'Autopilot is switched off.',
+        no_signals: 'No active keyword or creator yet.',
+        outside_hours: 'Outside your working hours — it waits until they start (Run now still works).',
+        paused: 'Paused for 24 hours after a LinkedIn warning.',
+        busy: 'Another task is running on LinkedIn (sending, comments or syncing) — it waits until that finishes.',
+        nothing_due: 'Waiting: every signal was checked recently. The next one is due at the time shown.',
+        plan: 'Autopilot is not included in the Starter plan.',
+      };
+      return { text: why[d] ?? `Waiting (${d}).`, tone: d === 'nothing_due' ? 'good' : 'warn' };
+    }
+    default:
+      return { text: 'The extension has not reported yet. Open LinkedIn in Chrome (extension 4.33 or newer).', tone: 'warn' };
+  }
+}
