@@ -375,6 +375,8 @@ export function statusText(s: Pick<AutopilotStatus, 'status' | 'detail'>): { tex
             ? 'Last run stopped: LinkedIn showed a security check. Automatic runs pause for 24 hours.'
             : d === 'timeout'
               ? 'Last run took too long and was stopped (was the computer asleep?).'
+              : d === 'interrupted'
+                ? 'Last run did not finish (Chrome was closed, the computer went off, or the extension updated). What it found is kept; the next run starts by itself.'
               : `Last run stopped (${d}).`,
         tone: 'bad',
       };
