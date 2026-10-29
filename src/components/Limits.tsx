@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, InlineError } from './ui';
 import {
+  COMMENT_HOUR_RANGE,
   COMMENT_RANGE,
   INVITE_RANGE,
   loadMemberLimits,
   loadMyLimits,
   resetText,
+  saveCommentHourly,
   saveMemberLimits,
   validLimit,
   type MemberLimit,
@@ -19,24 +21,30 @@ import type { FriendlyError } from '../lib/supabase';
 function LimitRow({ m, onSaved }: { m: MemberLimit; onSaved: (m: MemberLimit) => void }) {
   const [inv, setInv] = useState(String(m.invite_quota));
   const [com, setCom] = useState(String(m.comment_limit));
+  const hasHourly = typeof m.comment_hourly_limit === 'number';
+  const [hr, setHr] = useState(String(m.comment_hourly_limit ?? 10));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<FriendlyError | null>(null);
   const [saved, setSaved] = useState(false);
   const i = validLimit(inv, INVITE_RANGE);
   const c = validLimit(com, COMMENT_RANGE);
-  const dirty = inv !== String(m.invite_quota) || com !== String(m.comment_limit);
+  const h = hasHourly ? validLimit(hr, COMMENT_HOUR_RANGE) : 10;
+  const hourDirty = hasHourly && hr !== String(m.comment_hourly_limit);
+  const dayDirty = inv !== String(m.invite_quota) || com !== String(m.comment_limit);
+  const dirty = dayDirty || hourDirty;
   const who = m.email ?? m.user_id;
 
   const save = async () => {
-    if (i === null || c === null) return;
+    if (i === null || c === null || h === null) return;
     setBusy(true);
     setErr(null);
     setSaved(false);
-    const e = await saveMemberLimits(m.user_id, i, c);
+    const e = dayDirty ? await saveMemberLimits(m.user_id, i, c) : null;
+    const e2 = !e && hourDirty ? await saveCommentHourly(m.user_id, h) : null;
     setBusy(false);
-    if (e) return setErr(e);
+    if (e || e2) return setErr((e || e2)!);
     setSaved(true);
-    onSaved({ ...m, invite_quota: i, comment_limit: c });
+    onSaved({ ...m, invite_quota: i, comment_limit: c, ...(hasHourly ? { comment_hourly_limit: h } : {}) });
   };
 
   return (
@@ -77,13 +85,29 @@ function LimitRow({ m, onSaved }: { m: MemberLimit; onSaved: (m: MemberLimit) =>
           }}
         />
         {c === null ? <p className="mt-1 text-[11px] text-red-700">1 to 50</p> : null}
+        {typeof m.comments_today === 'number' ? <p className="mt-1 text-[11px] text-slate-500">{m.comments_today} today</p> : null}
       </td>
+      {hasHourly ? (
+        <td className="px-2 py-3">
+          <input
+            className="input w-20 py-1 text-right tabular-nums"
+            inputMode="numeric"
+            aria-label={`Comments an hour for ${who}`}
+            value={hr}
+            onChange={(e) => {
+              setHr(e.target.value);
+              setSaved(false);
+            }}
+          />
+          {h === null ? <p className="mt-1 text-[11px] text-red-700">1 to 50</p> : null}
+        </td>
+      ) : null}
       <td className="px-4 py-3">
         <button
           type="button"
           className="btn-secondary py-1"
           aria-label={`Save limits for ${who}`}
-          disabled={!dirty || busy || i === null || c === null}
+          disabled={!dirty || busy || i === null || c === null || h === null}
           onClick={() => void save()}
         >
           {busy ? 'Saving…' : 'Save'}
@@ -110,6 +134,7 @@ export function MemberLimitsCard({ client }: { client: string }) {
 
   if (missing) return null;
   const shown = (rows ?? []).filter((r) => !client || r.client_id === client);
+  const hourly = shown.some((r) => typeof r.comment_hourly_limit === 'number');
   const byClient = new Map<string, MemberLimit[]>();
   for (const r of shown) byClient.set(r.client_id, [...(byClient.get(r.client_id) ?? []), r]);
 
@@ -130,16 +155,21 @@ export function MemberLimitsCard({ client }: { client: string }) {
           {[...byClient.entries()].map(([cid, members]) => (
             <div key={cid} className="overflow-x-auto">
               {byClient.size > 1 || !client ? <h3 className="mb-1 text-sm font-semibold text-slate-900">{cid}</h3> : null}
-              <table className="w-full min-w-[560px] table-fixed text-sm" aria-label={`${cid} limits`}>
+              <table className="w-full min-w-[640px] table-fixed text-sm" aria-label={`${cid} limits`}>
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                     <th className="w-1/2 px-4 py-2 font-medium">Member</th>
                     <th className="px-2 py-2 font-medium" title="Connection requests, counted from midnight in the member's own time zone">
                       Invites a day
                     </th>
-                    <th className="px-2 py-2 font-medium" title="Comments, counted over the last 24 hours">
+                    <th className="px-2 py-2 font-medium" title={hourly ? 'Comments, counted from midnight in the member’s own time zone' : 'Comments, counted over the last 24 hours'}>
                       Comments a day
                     </th>
+                    {hourly ? (
+                      <th className="px-2 py-2 font-medium" title="At most this many comments in any 60 minutes">
+                        Comments an hour
+                      </th>
+                    ) : null}
                     <th className="px-4 py-2" />
                   </tr>
                 </thead>
@@ -158,7 +188,10 @@ export function MemberLimitsCard({ client }: { client: string }) {
           <p className="text-xs text-slate-500">
             LinkedIn does not publish official limits. A safe start is 15–25 invites and 10–20 comments a day; new or quiet accounts
             should stay lower (warm-up in the member’s Settings raises invites slowly). Invites start again at midnight in each
-            member’s own time zone (their Settings); comments count over the last 24 hours.
+            member’s own time zone (their Settings);{' '}
+            {hourly
+              ? 'so do comments. “Comments an hour” is the same as the daily number unless you lower it; a lower number spreads comments out (a run waits by itself when it reaches it).'
+              : 'comments count over the last 24 hours.'}
           </p>
         </div>
       )}
@@ -202,9 +235,21 @@ export function MyLimitsCard() {
         <div>
           <p className="text-xs text-slate-500">Comments</p>
           <p className="text-2xl font-semibold tabular-nums text-slate-900">
-            {me.comment_limit} <span className="text-base font-normal text-slate-500">a day</span>
+            {typeof me.comments_today === 'number' ? (
+              <>
+                {me.comments_today} <span className="text-base font-normal text-slate-500">of {me.comment_limit} today</span>
+              </>
+            ) : (
+              <>
+                {me.comment_limit} <span className="text-base font-normal text-slate-500">a day</span>
+              </>
+            )}
           </p>
-          <p className="mt-1 text-xs text-slate-600">Counted over the last 24 hours.</p>
+          <p className="mt-1 text-xs text-slate-600">
+            {typeof me.comment_hourly_limit === 'number'
+              ? `Starts again at ${resetText(me.tz)}${me.comment_hourly_limit < me.comment_limit ? ` · at most ${me.comment_hourly_limit} an hour` : ''}.`
+              : 'Counted over the last 24 hours.'}
+          </p>
         </div>
       </div>
       <p className="mt-3 text-xs text-slate-500">
