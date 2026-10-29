@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { EmptyState, ErrorState, PageHeader, SkeletonCards } from '../components/ui';
 import { amPlatformAdmin, loadReportClients, type ReportClient } from '../lib/team';
 import { HEALTH_LABEL, loadSenders, reasonsOf, type Health, type Sender } from '../lib/senders';
@@ -111,7 +111,8 @@ function SenderCard({ s, admin }: { s: Sender; admin: boolean }) {
 export function SendersPage() {
   const [admin, setAdmin] = useState(false);
   const [clients, setClients] = useState<ReportClient[] | null>(null);
-  const [client, setClient] = useState('');
+  const [params] = useSearchParams();
+  const [client, setClient] = useState(() => params.get('client') ?? '');
   const [rows, setRows] = useState<Sender[] | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
   const [missing, setMissing] = useState(false);
@@ -202,7 +203,7 @@ export function SendersPage() {
           </section>
 
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            {admin && clients && clients.length > 1 ? (
+            {clients && clients.length > 1 ? (
               <select className="input w-56 py-1.5 text-sm" aria-label="Client" value={client} onChange={(e) => setClient(e.target.value)}>
                 <option value="">All clients ({clients.length})</option>
                 {clients.map((c) => (
@@ -226,7 +227,7 @@ export function SendersPage() {
           ) : (
             <section aria-label="Senders" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {shown.map((s) => (
-                <SenderCard key={s.client_id + s.user_id} s={s} admin={admin} />
+                <SenderCard key={s.client_id + s.user_id} s={s} admin={admin || (clients?.length ?? 0) > 1} />
               ))}
             </section>
           )}
