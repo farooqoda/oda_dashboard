@@ -454,6 +454,9 @@ export function TeamPage() {
         actions={
           admin ? (
             <div className="flex flex-wrap gap-2">
+              <Link to="/team/senders" className="btn-secondary">
+                Senders health
+              </Link>
               <Link to="/team/customers" className="btn-secondary">
                 Customers
               </Link>
@@ -464,7 +467,11 @@ export function TeamPage() {
                 Manage teams
               </Link>
             </div>
-          ) : undefined
+          ) : (
+            <Link to="/team/senders" className="btn-secondary">
+              Senders health
+            </Link>
+          )
         }
         description={
           admin
