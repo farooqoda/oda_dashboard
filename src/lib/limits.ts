@@ -9,6 +9,9 @@ export interface MemberLimit {
   invites_today: number;
   comment_limit: number;
   tz: string;
+  /** J1 (may be missing before the SQL runs) */
+  comment_hourly_limit?: number;
+  comments_today?: number;
 }
 export interface MyLimits {
   invite_quota: number;
@@ -17,10 +20,13 @@ export interface MyLimits {
   comment_limit: number;
   tz: string;
   day_starts_at: string;
+  comment_hourly_limit?: number;
+  comments_today?: number;
 }
 
 export const INVITE_RANGE = [1, 100] as const;
 export const COMMENT_RANGE = [1, 50] as const;
+export const COMMENT_HOUR_RANGE = [1, 50] as const;
 
 type Result<T> = { data: T; error: null; missing?: false } | { data: null; error: FriendlyError | null; missing?: boolean };
 const notConfigured = (): Result<never> => ({ data: null, error: { message: supabaseConfigError ?? 'Not configured', hint: null, code: 'CONFIG' } });
@@ -39,6 +45,14 @@ export async function saveMemberLimits(userId: string, invites: number, comments
   const { error } = await supabase.rpc('gab_set_member_limits', { p_user: userId, p_invites: invites, p_comments: comments });
   if (!error) return null;
   // the database's own message is already written for people ("Invites a day: 1 to 100", …)
+  return { message: error.message, hint: null, code: error.code ?? null };
+}
+
+/** J1: comments an hour (separate call; the daily limits keep their own). */
+export async function saveCommentHourly(userId: string, perHour: number): Promise<FriendlyError | null> {
+  if (!supabase) return notConfigured().error;
+  const { error } = await supabase.rpc('gab_set_member_comment_hourly', { p_user: userId, p_per_hour: perHour });
+  if (!error) return null;
   return { message: error.message, hint: null, code: error.code ?? null };
 }
 
