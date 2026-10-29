@@ -23,6 +23,7 @@ import { SignUpPage } from './pages/SignUpPage';
 import { TeamPage } from './pages/TeamPage';
 import { ManageTeamsPage } from './pages/ManageTeamsPage';
 import { WebsiteChatPage } from './pages/WebsiteChatPage';
+import { CustomersPage } from './pages/CustomersPage';
 
 function Shell() {
   return (
@@ -45,6 +46,7 @@ function Shell() {
             <Route path="/team" element={<TeamPage />} />
             <Route path="/team/manage" element={<ManageTeamsPage />} />
             <Route path="/team/website-chat" element={<WebsiteChatPage />} />
+            <Route path="/team/customers" element={<CustomersPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
