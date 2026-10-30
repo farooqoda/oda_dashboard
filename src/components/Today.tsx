@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../data/AuthProvider';
 import { useLeads } from '../data/LeadsProvider';
 import { AP_READY_CHANGED, loadReadyCount } from '../lib/autopilot';
-import { bellCount, todayItems, withWarmLeads, type TodayItem } from '../lib/today';
+import { REPLIES_CHANGED, loadReplyCounts, type ReplyCounts } from '../lib/replies';
+import { bellCount, todayItems, withCommentReplies, withWarmLeads, type TodayItem } from '../lib/today';
 import { useAutomation } from './Automation';
 
 /** Warm leads waiting for approval (one shared, cached request for every Today/bell on the page). */
@@ -26,12 +27,36 @@ function useWarmLeadsReady(userId: string | null) {
   return ready;
 }
 
+/** Comment replies waiting for the member (SQL k1; 0 when it is not installed). */
+function useReplyCounts(userId: string | null) {
+  const [c, setC] = useState<ReplyCounts | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+    const load = (force = false) => void loadReplyCounts(force).then((v) => live && setC(v));
+    load();
+    const onChange = () => load(true);
+    window.addEventListener(REPLIES_CHANGED, onChange);
+    const t = window.setInterval(() => load(true), 5 * 60 * 1000);
+    return () => {
+      live = false;
+      window.removeEventListener(REPLIES_CHANGED, onChange);
+      window.clearInterval(t);
+    };
+  }, [userId]);
+  return c;
+}
+
 export function useToday() {
   const { leads } = useLeads();
   const { user } = useAuth();
   const { settings } = useAutomation();
   const ready = useWarmLeadsReady(user?.id ?? null);
-  const items = useMemo(() => withWarmLeads(todayItems(leads, user?.id ?? null, settings), ready), [leads, user, settings, ready]);
+  const rc = useReplyCounts(user?.id ?? null);
+  const items = useMemo(
+    () => withCommentReplies(withWarmLeads(todayItems(leads, user?.id ?? null, settings), ready), rc?.to_review ?? 0, rc?.failed ?? 0),
+    [leads, user, settings, ready, rc],
+  );
   return { items, count: bellCount(items) };
 }
 

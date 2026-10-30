@@ -12,6 +12,8 @@ import {
   type EngagerKind,
 } from '../lib/engagers';
 import { formatDateTime } from '../lib/format';
+import { replyFromEngager, repliesChanged, writeReplyDrafts } from '../lib/replies';
+import { useAuth } from '../data/AuthProvider';
 import type { FriendlyError } from '../lib/supabase';
 import type { Post } from '../lib/types';
 import { FormError } from './AuthLayout';
@@ -52,6 +54,24 @@ export function EngagersPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const { user } = useAuth();
+  const [replied, setReplied] = useState<Set<number>>(new Set());
+
+  const reply = async (id: number) => {
+    setBusy('reply:' + id);
+    setError(null);
+    setNotice(null);
+    const r = await replyFromEngager(id);
+    if (r.error) setError(r.error);
+    else {
+      setReplied((x) => new Set(x).add(id));
+      const e = user?.id ? await writeReplyDrafts(user.id) : null;
+      if (e) setError(e);
+      else setNotice('The AI is writing a reply — review it in Comment Assistant → Replies to comments.');
+      repliesChanged();
+    }
+    setBusy(null);
+  };
 
   const reload = useCallback(async () => {
     const r = await loadEngagers(post.id);
@@ -270,6 +290,18 @@ export function EngagersPanel({
                       {r.headline ? <p className="line-clamp-1 text-xs text-slate-600">{r.headline}</p> : null}
                       {r.comment_text ? (
                         <p className="mt-1 whitespace-pre-wrap rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-800">“{r.comment_text}”</p>
+                      ) : null}
+                      {r.kind === 'comment' && r.comment_text ? (
+                        replied.has(r.id) ? (
+                          <Link to="/comments?tab=replies" className="mt-1 inline-block text-xs font-medium text-emerald-700 hover:underline">
+                            Reply being written → review it
+                          </Link>
+                        ) : (
+                          <button type="button" className="mt-1 text-xs font-medium text-brand-700 hover:underline disabled:opacity-50"
+                            disabled={busy !== null} onClick={() => void reply(r.id)}>
+                            {busy === 'reply:' + r.id ? 'Starting…' : '↳ Reply to this comment'}
+                          </button>
+                        )
                       ) : null}
                     </div>
                   </li>

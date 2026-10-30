@@ -84,6 +84,8 @@ export const DRAFT_REPLY_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-re
  * Each call drafts up to 8 posts and answers `{ drafted, skipped, failed, remaining }`.
  */
 export const DRAFT_COMMENTS_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/draft-comments';
+/** v4.36 comment replies (SQL k1): `{action:'draft', user_id}` asks the AI to write waiting replies. */
+export const REPLIES_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/ic-replies';
 
 /**
  * Writes the longer chat messages (for leads you are already connected to)

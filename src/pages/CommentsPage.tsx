@@ -1,5 +1,7 @@
 import { LanguagePickers, Translation } from '../components/Languages';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { CommentRepliesView } from '../components/CommentReplies';
 import { Card, EmptyState, ErrorState, InlineError, PageHeader, SkeletonCards } from '../components/ui';
 import { useAuth } from '../data/AuthProvider';
 import {
@@ -407,6 +409,43 @@ type RowAction = 'generate' | 'regenerate' | 'force' | 'post' | 'cancel' | 'dism
 // Page
 // ---------------------------------------------------------------------------
 export function CommentsPage() {
+  const [params, setParams] = useSearchParams();
+  const replies = params.get('tab') === 'replies';
+  const switcher = (
+    <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1" role="tablist" aria-label="Comments or replies">
+      {[
+        { key: false, label: 'Comments on posts' },
+        { key: true, label: 'Replies to comments' },
+      ].map((o) => (
+        <button
+          key={String(o.key)}
+          type="button"
+          role="tab"
+          aria-selected={replies === o.key}
+          onClick={() => setParams(o.key ? { tab: 'replies' } : {}, { replace: true })}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium ${replies === o.key ? 'bg-brand-600 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+  if (replies) {
+    return (
+      <>
+        <PageHeader
+          title="Comment Assistant"
+          description="Reply to the people who comment on your posts and answer your comments. The AI drafts each reply in your voice; you approve, and the extension posts it under the right comment on LinkedIn."
+        />
+        {switcher}
+        <CommentRepliesView />
+      </>
+    );
+  }
+  return <CommentPostsView switcher={switcher} />;
+}
+
+function CommentPostsView({ switcher }: { switcher: ReactNode }) {
   const { user, clientId } = useAuth();
   const userId = user?.id ?? null;
   const extension = useExtensionTask();
@@ -623,6 +662,8 @@ export function CommentsPage() {
           </button>
         }
       />
+
+      {switcher}
 
       <CommentPromptPanel userId={userId} clientId={clientId} />
 
