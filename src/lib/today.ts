@@ -9,7 +9,7 @@ import type { Lead } from './types';
  * and (built the same way by n8n) in the morning email.
  */
 export interface TodayItem {
-  key: 'paused' | 'replies' | 'followups' | 'warm_leads' | 'failed' | 'auto_off' | 'ext_missing' | 'accepted';
+  key: 'paused' | 'replies' | 'followups' | 'warm_leads' | 'comment_replies' | 'failed' | 'auto_off' | 'ext_missing' | 'accepted';
   icon: string;
   text: string;
   to: string; // a dashboard path, or an https:// link
@@ -68,6 +68,20 @@ export function withWarmLeads(items: TodayItem[], ready: number): TodayItem[] {
     text: `${ready} new warm lead${ready === 1 ? '' : 's'} from Autopilot — notes ready for your approval`,
   };
   const at = items.findIndex((i) => !['paused', 'replies', 'followups'].includes(i.key));
+  return at === -1 ? [...items, item] : [...items.slice(0, at), item, ...items.slice(at)];
+}
+
+/** Comment replies (SQL k1): AI drafts waiting for approval, and replies that could not be posted. */
+export function withCommentReplies(items: TodayItem[], toReview: number, failed = 0): TodayItem[] {
+  const n = toReview + failed;
+  if (!n) return items;
+  const item: TodayItem = {
+    key: 'comment_replies', icon: '🗨️', tone: failed && !toReview ? 'red' : 'green', count: n, to: '/comments?tab=replies',
+    text: toReview
+      ? `${toReview} comment repl${toReview === 1 ? 'y' : 'ies'} ready for your approval${failed ? ` · ${failed} could not be posted` : ''}`
+      : `${failed} comment repl${failed === 1 ? 'y' : 'ies'} could not be posted`,
+  };
+  const at = items.findIndex((i) => !['paused', 'replies', 'followups', 'warm_leads'].includes(i.key));
   return at === -1 ? [...items, item] : [...items.slice(0, at), item, ...items.slice(at)];
 }
 

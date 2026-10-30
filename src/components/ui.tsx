@@ -155,7 +155,7 @@ export function Card({
   return (
     <section className={`card ${className}`}>
       {(title || actions) && (
-        <header className="flex items-start justify-between gap-3 border-b border-slate-200/80 px-6 py-4">
+        <header className="flex items-start justify-between gap-3 border-b border-slate-200/80 px-6 py-4 last:border-b-0">
           <div>
             {title ? <h2 className="text-base font-bold text-ink">{title}</h2> : null}
             {description ? <p className="mt-0.5 text-xs text-slate-500">{description}</p> : null}
@@ -163,7 +163,7 @@ export function Card({
           {actions}
         </header>
       )}
-      <div className="p-6">{children}</div>
+      {children === null || children === undefined || children === false ? null : <div className="p-6">{children}</div>}
     </section>
   );
 }
