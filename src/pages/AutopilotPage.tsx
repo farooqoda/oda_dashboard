@@ -403,7 +403,7 @@ export function AutopilotPage() {
         <Card
           className="min-w-0 lg:col-span-1"
           title="Autopilot"
-          description="Runs by itself in a background tab while LinkedIn is open in Chrome, inside your working hours. There is no Start button: switch it on, or press Run now above."
+          description="Runs by itself while LinkedIn is open in Chrome, inside your working hours, in a small LinkedIn window of its own (it closes when done). There is no Start button: switch it on, or press Run now above."
         >
           <label className="flex items-center gap-3 text-sm font-semibold text-slate-900">
             <input
