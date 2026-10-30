@@ -48,6 +48,14 @@ export function cancelQueuedLeads(ids: number[]) {
   return updateLeads(ids, 'send_status', ['queued'], { send_status: 'none', send_queued_at: null });
 }
 
+/**
+ * Failed sends the member does not want to retry (e.g. LinkedIn's limit on notes): move them to
+ * Skipped so they stop showing on the bell and in the morning email. "Try again" still works there.
+ */
+export function skipFailedLeads(ids: number[]) {
+  return updateLeads(ids, 'send_status', ['failed'], { send_status: 'skipped', send_queued_at: null });
+}
+
 /** Ask the AI for a (new) chat message for these leads. */
 export function requestChatMessages(ids: number[], userId: string) {
   return updateLeads(ids, 'chat_status', ['none', 'drafted'], {

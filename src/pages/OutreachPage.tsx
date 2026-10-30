@@ -26,6 +26,7 @@ import { useExtensionTask } from '../lib/extensionBridge';
 import { displayName, formatDate, formatDateTime, stageOf } from '../lib/format';
 import {
   cancelQueuedLeads,
+  skipFailedLeads,
   loadChatPrompt,
   loadInviteQuota,
   queueLeads,
@@ -148,7 +149,7 @@ function ChatPromptPanel({ userId, clientId, inviteQuota }: { userId: string; cl
 // ---------------------------------------------------------------------------
 // One lead
 // ---------------------------------------------------------------------------
-type RowAction = 'send' | 'cancel' | 'chat' | 'invite' | 'contacted' | 'details';
+type RowAction = 'send' | 'cancel' | 'skip' | 'chat' | 'invite' | 'contacted' | 'details';
 
 function LeadRow({
   lead,
@@ -328,6 +329,12 @@ function LeadRow({
             <button type="button" className="btn-primary" disabled={busy || !canSend} onClick={() => onAction('send')}
               title={!hasLink ? 'This lead has no LinkedIn link' : undefined}>
               {status === 'none' ? 'Send' : 'Try again'}
+            </button>
+          ) : null}
+          {status === 'failed' ? (
+            <button type="button" className="btn-secondary" disabled={busy} onClick={() => onAction('skip')}
+              title="Move to Skipped: no more alerts on the bell or in the morning email. You can still try again from Skipped.">
+              Skip
             </button>
           ) : null}
           {status === 'queued' ? (
@@ -596,6 +603,18 @@ export function OutreachPage() {
     refresh();
   };
 
+  const skipFailed = async (items: Lead[]) => {
+    const ids = items.map((l) => l.id);
+    if (!ids.length) return;
+    setActionError(null);
+    markBusy(ids, true);
+    const res = await skipFailedLeads(ids);
+    markBusy(ids, false);
+    if (res.error) setActionError(res.error);
+    setSelected(new Set());
+    return refresh();
+  };
+
   const onAction = async (l: Lead, action: RowAction) => {
     if (action === 'details') return setOpenId(l.id);
     if (action === 'send') return send([l]);
@@ -608,6 +627,7 @@ export function OutreachPage() {
       if (res.error) setActionError(res.error);
       return refresh();
     }
+    if (action === 'skip') return skipFailed([l]);
     if (action === 'contacted') {
       markBusy([l.id], true);
       const err = await updateLead(l.id, { stage: 'Contacted' });
@@ -737,6 +757,18 @@ export function OutreachPage() {
         </div>
       ) : null}
 
+      {tab === 'failed' && visible.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+          <span>
+            Messages that can’t go out (for example LinkedIn’s limit on connection notes) keep showing on the bell and in the morning email.
+            Skip them to stop the alerts — you can still try again from Skipped.
+          </span>
+          <button type="button" className="btn-secondary" disabled={busyIds.size > 0} onClick={() => void skipFailed(visible)}>
+            Skip all {visible.length} failed
+          </button>
+        </div>
+      ) : null}
+
       {showCheckboxes && selectableInView.length > 0 ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -749,6 +781,11 @@ export function OutreachPage() {
             Select all ({selectableInView.length})
           </label>
           <span className="flex flex-wrap items-center gap-2">
+            {tab === 'failed' ? (
+              <button type="button" className="btn-secondary" disabled={selectedInView.length === 0} onClick={() => void skipFailed(selectedInView)}>
+                Skip selected ({selectedInView.length})
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn-secondary"
