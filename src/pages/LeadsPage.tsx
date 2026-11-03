@@ -9,6 +9,7 @@ import {
   FitBadge,
   PageHeader,
   SkeletonTable,
+  ConnectionPill,
   StagePill,
   Truncate,
   TypePill,
@@ -495,6 +496,7 @@ export function LeadsPage() {
                                   when a long stage name meets a narrow viewport. */}
                               <div className="overflow-hidden" title={stageOf(lead)}>
                                 <StagePill stage={stageOf(lead)} />
+                                <div><ConnectionPill status={lead.connection_status} /></div>
                               </div>
                             </td>
                           ) : null}
@@ -537,6 +539,7 @@ export function LeadsPage() {
                           <FitBadge score={fitScore(lead.traits)} />
                           <TypePill type={personalityType(lead.traits)} />
                           <StagePill stage={stageOf(lead)} />
+                          <ConnectionPill status={lead.connection_status} />
                         </div>
                       </div>
                     </div>

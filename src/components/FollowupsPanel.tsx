@@ -28,6 +28,7 @@ export function FollowupList({
   followupTotal,
   onChanged,
   onOpen,
+  onQueued,
 }: {
   kind: Kind;
   leads: Lead[];
@@ -35,6 +36,7 @@ export function FollowupList({
   followupTotal: number;
   onChanged: () => void;
   onOpen: (id: number) => void;
+  onQueued?: (n: number) => void;
 }) {
   if (leads.length === 0) {
     return (
@@ -48,7 +50,7 @@ export function FollowupList({
   return (
     <div className="space-y-4">
       {leads.map((l) => (
-        <DraftRow key={l.id} kind={kind} lead={l} userId={userId} followupTotal={followupTotal} onChanged={onChanged} onOpen={onOpen} />
+        <DraftRow key={l.id} kind={kind} lead={l} userId={userId} followupTotal={followupTotal} onChanged={onChanged} onOpen={onOpen} onQueued={onQueued} />
       ))}
     </div>
   );
@@ -61,6 +63,7 @@ function DraftRow({
   followupTotal,
   onChanged,
   onOpen,
+  onQueued,
 }: {
   kind: Kind;
   lead: Lead;
@@ -68,6 +71,7 @@ function DraftRow({
   followupTotal: number;
   onChanged: () => void;
   onOpen: (id: number) => void;
+  onQueued?: (n: number) => void;
 }) {
   const saved = (kind === 'followup' ? lead.followup_draft : lead.reply_draft) ?? '';
   const [text, setText] = useState<string | null>(null);
@@ -84,7 +88,7 @@ function DraftRow({
   const step = Math.min((lead.followup_step ?? 0) + 1, Math.max(followupTotal, 1));
   const error = kind === 'followup' ? lead.followup_error : lead.send_error;
 
-  const act = async (fn: () => Promise<{ error: FriendlyError | null; data: number | null }>) => {
+  const act = async (fn: () => Promise<{ error: FriendlyError | null; data: number | null }>, queues = false) => {
     setBusy(true);
     setErr(null);
     const r = await fn();
@@ -92,10 +96,11 @@ function DraftRow({
     if (r.error) setErr(r.error);
     else {
       setText(null);
+      if (queues && r.data) onQueued?.(r.data);
       onChanged();
     }
   };
-  const approve = () => act(() => (kind === 'followup' ? approveFollowup(lead, value, userId) : approveReply(lead, value, userId)));
+  const approve = () => act(() => (kind === 'followup' ? approveFollowup(lead, value, userId) : approveReply(lead, value, userId)), true);
   const saveText = async () => {
     if (text === null || text === saved || !ready) return;
     const r = kind === 'followup' ? await saveFollowupText(lead, text) : await saveReplyText(lead, text);
