@@ -321,7 +321,30 @@ export type SortKey =
   | 'fit_score'
   | 'type'
   | 'stage'
-  | 'created_at';
+  | 'created_at'
+  | 'invite_sent'
+  | 'connected';
+
+/** v4.36.5: Leads table columns. A connection request went out (date when known). */
+export function inviteSentInfo(lead: Lead): { yes: boolean; at: string | null } {
+  const s = (lead.connection_status ?? '').trim().toLowerCase();
+  const sentAsInvite = lead.send_channel === 'invite' && (lead.send_status === 'sent' || !!lead.send_kind) && !!lead.send_sent_at;
+  const yes = sentAsInvite || /invite|pending/.test(s);
+  return { yes, at: sentAsInvite ? lead.send_sent_at ?? null : null };
+}
+
+/** You are connected on LinkedIn (date when the inbox check saw them accept). */
+export function connectedInfo(lead: Lead): { yes: boolean; at: string | null } {
+  const s = (lead.connection_status ?? '').trim().toLowerCase();
+  const yes = s === 'connected' || s === '1st' || s.startsWith('connected');
+  return { yes, at: yes ? lead.connected_detected_at ?? null : null };
+}
+
+function infoSortValue(info: { yes: boolean; at: string | null }): number | null {
+  if (!info.yes) return null;
+  const t = info.at ? new Date(info.at).getTime() : NaN;
+  return Number.isNaN(t) ? 0 : t;   // "yes, date unknown" sorts as the oldest
+}
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -343,6 +366,10 @@ function sortValue(lead: Lead, key: SortKey): string | number | null {
       const index = (PIPELINE_STAGES as readonly string[]).indexOf(stageOf(lead));
       return index === -1 ? PIPELINE_STAGES.length : index;
     }
+    case 'invite_sent':
+      return infoSortValue(inviteSentInfo(lead));
+    case 'connected':
+      return infoSortValue(connectedInfo(lead));
     case 'created_at': {
       if (!lead.created_at) return null;
       const t = new Date(lead.created_at).getTime();

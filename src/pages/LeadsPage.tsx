@@ -26,6 +26,8 @@ import {
   isFilterActive,
   isNonSearchFilterActive,
   sortLeads,
+  inviteSentInfo,
+  connectedInfo,
   type LeadFilters,
   type SortDirection,
   type SortKey,
@@ -41,6 +43,8 @@ const TOGGLEABLE = [
   { key: 'fit_score', label: 'Fit score' },
   { key: 'type', label: 'Type' },
   { key: 'stage', label: 'Stage' },
+  { key: 'invite_sent', label: 'Invite sent' },
+  { key: 'connected', label: 'Connected' },
   { key: 'created_at', label: 'Created' },
 ] as const;
 
@@ -53,10 +57,23 @@ const ALL_VISIBLE: Record<ColumnKey, boolean> = {
   fit_score: true,
   type: true,
   stage: true,
+  invite_sent: true,
+  connected: true,
   created_at: true,
 };
 
 const STORAGE_KEY = 'oda.leads.columns.v1';
+
+/** v4.36.5: "Invite sent" / "Connected" cells: a tick with the date, or a dash. */
+function YesDate({ info, tone }: { info: { yes: boolean; at: string | null }; tone: 'amber' | 'emerald' }) {
+  if (!info.yes) return <span className="text-slate-300" aria-label="No">—</span>;
+  const cls = tone === 'emerald' ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : 'bg-amber-50 text-amber-800 ring-amber-200';
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums ring-1 ${cls}`} title={info.at ? formatDate(info.at) ?? undefined : undefined}>
+      ✓{info.at ? ` ${formatDateCompact(info.at) ?? ''}` : ''}
+    </span>
+  );
+}
 
 function SortHeader({
   label,
@@ -133,7 +150,7 @@ export function LeadsPage() {
       setDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
-      setDirection(key === 'created_at' || key === 'fit_score' ? 'desc' : 'asc');
+      setDirection(key === 'created_at' || key === 'fit_score' || key === 'invite_sent' || key === 'connected' ? 'desc' : 'asc');
     }
   };
 
@@ -364,7 +381,7 @@ export function LeadsPage() {
                           current={sortKey}
                           direction={direction}
                           onSort={onSort}
-                          className="w-[21%]"
+                          className="w-[18%]"
                         />
                         {isColumn('title') ? (
                           <SortHeader
@@ -373,7 +390,7 @@ export function LeadsPage() {
                             current={sortKey}
                             direction={direction}
                             onSort={onSort}
-                            className="w-[13%]"
+                            className="w-[11%]"
                           />
                         ) : null}
                         {isColumn('company') ? (
@@ -383,7 +400,7 @@ export function LeadsPage() {
                             current={sortKey}
                             direction={direction}
                             onSort={onSort}
-                            className="w-[12%]"
+                            className="w-[10%]"
                           />
                         ) : null}
                         {isColumn('bucket') ? (
@@ -393,7 +410,7 @@ export function LeadsPage() {
                             current={sortKey}
                             direction={direction}
                             onSort={onSort}
-                            className="w-[13%]"
+                            className="w-[9%]"
                           />
                         ) : null}
                         {isColumn('fit_score') ? (
@@ -403,7 +420,7 @@ export function LeadsPage() {
                             current={sortKey}
                             direction={direction}
                             onSort={onSort}
-                            className="w-[7%]"
+                            className="w-[6%]"
                           />
                         ) : null}
                         {isColumn('type') ? (
@@ -413,7 +430,7 @@ export function LeadsPage() {
                             current={sortKey}
                             direction={direction}
                             onSort={onSort}
-                            className="w-[8%]"
+                            className="w-[7%]"
                           />
                         ) : null}
                         {isColumn('stage') ? (
@@ -423,7 +440,27 @@ export function LeadsPage() {
                             current={sortKey}
                             direction={direction}
                             onSort={onSort}
-                            className="w-[13%]"
+                            className="w-[11%]"
+                          />
+                        ) : null}
+                        {isColumn('invite_sent') ? (
+                          <SortHeader
+                            label="Invite sent"
+                            sortKey="invite_sent"
+                            current={sortKey}
+                            direction={direction}
+                            onSort={onSort}
+                            className="w-[9%]"
+                          />
+                        ) : null}
+                        {isColumn('connected') ? (
+                          <SortHeader
+                            label="Connected"
+                            sortKey="connected"
+                            current={sortKey}
+                            direction={direction}
+                            onSort={onSort}
+                            className="w-[9%]"
                           />
                         ) : null}
                         {isColumn('created_at') ? (
@@ -433,7 +470,7 @@ export function LeadsPage() {
                             current={sortKey}
                             direction={direction}
                             onSort={onSort}
-                            className="w-[12%]"
+                            className="w-[9%]"
                           />
                         ) : null}
                       </tr>
@@ -496,10 +533,11 @@ export function LeadsPage() {
                                   when a long stage name meets a narrow viewport. */}
                               <div className="overflow-hidden" title={stageOf(lead)}>
                                 <StagePill stage={stageOf(lead)} />
-                                <div><ConnectionPill status={lead.connection_status} /></div>
                               </div>
                             </td>
                           ) : null}
+                          {isColumn('invite_sent') ? <td className="px-3 py-2.5"><YesDate info={inviteSentInfo(lead)} tone="amber" /></td> : null}
+                          {isColumn('connected') ? <td className="px-3 py-2.5"><YesDate info={connectedInfo(lead)} tone="emerald" /></td> : null}
                           {isColumn('created_at') ? (
                             <td
                               className="truncate px-3 py-2.5 text-xs tabular-nums text-slate-500"

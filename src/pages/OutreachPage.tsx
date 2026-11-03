@@ -40,6 +40,7 @@ import {
 import { personalityType } from '../lib/traitsRegistry';
 import type { FriendlyError } from '../lib/supabase';
 import type { Lead, SendStatus } from '../lib/types';
+import { lastSent } from '../lib/home';
 
 type TabKey = 'send' | 'queue' | 'sent' | 'failed' | 'skipped' | 'followups' | 'replies';
 
@@ -259,6 +260,12 @@ function LeadRow({
               {lead.send_sent_at ? ` · ${formatDateTime(lead.send_sent_at)}` : ''}
             </p>
           ) : null}
+          {status === 'sent' && lead.followup_last_sent_at ? (
+            <p className="text-xs text-emerald-800">Last follow-up sent · {formatDateTime(lead.followup_last_sent_at)}</p>
+          ) : null}
+          {status === 'sent' && lead.reply_draft_status === 'sent' && lead.reply_sent_at ? (
+            <p className="text-xs text-emerald-800">Your reply sent · {formatDateTime(lead.reply_sent_at)}</p>
+          ) : null}
 
           {lead.send_kind && (status === 'queued' || status === 'sending') ? (
             <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
@@ -424,7 +431,12 @@ export function OutreachPage() {
     return c;
   }, [leads]);
 
-  const visible = useMemo(() => leads.filter(TABS.find((t) => t.key === tab)!.match), [leads, tab]);
+  const visible = useMemo(() => {
+    const rows = leads.filter(TABS.find((t) => t.key === tab)!.match);
+    // v4.36.5: Sent tab: the most recently sent first (first messages, follow-ups and replies)
+    if (tab === 'sent') return [...rows].sort((a, b) => (lastSent(b)?.at ?? 0) - (lastSent(a)?.at ?? 0));
+    return rows;
+  }, [leads, tab]);
 
   const sendable = useCallback(
     (l: Lead) => {

@@ -13,7 +13,7 @@ import {
   SuggestedCard,
 } from '../components/home/HomeWidgets';
 import { useAuth } from '../data/AuthProvider';
-import { followUps, messageQueue, networkNodes, replyFunnel, sentThisWeek, suggestedConnection } from '../lib/home';
+import { followUps, messageQueue, networkNodes, replyFunnel, sentThisWeek, suggestedConnection, type FunnelPeriod } from '../lib/home';
 import { loadCommentPosts } from '../lib/comments';
 import { firstNameOf, greeting } from '../lib/person';
 import { outreachQueue, repliedCount } from '../lib/selectors';
@@ -79,7 +79,23 @@ export function DashboardPage() {
   const suggested = useMemo(() => suggestedConnection(leads), [leads]);
   const network = useMemo(() => networkNodes(leads), [leads]);
   const week = useMemo(() => sentThisWeek(leads), [leads]);
-  const funnel = useMemo(() => replyFunnel(leads), [leads]);
+  const [funnelPeriod, setFunnelPeriod] = useState<FunnelPeriod>(() => {
+    try {
+      const v = localStorage.getItem('ic_reply_rate_period');
+      return v === '7' || v === '30' || v === '90' ? (Number(v) as FunnelPeriod) : 'all';
+    } catch {
+      return 'all';
+    }
+  });
+  const pickFunnelPeriod = (p: FunnelPeriod) => {
+    setFunnelPeriod(p);
+    try {
+      localStorage.setItem('ic_reply_rate_period', String(p));
+    } catch {
+      /* ignore */
+    }
+  };
+  const funnel = useMemo(() => replyFunnel(leads, funnelPeriod), [leads, funnelPeriod]);
   const queue = useMemo(() => messageQueue(leads), [leads]);
 
   // Comment drafts for the follow-up tracker. Read-only; a failure just leaves them out.
@@ -200,7 +216,7 @@ export function DashboardPage() {
         <NetworkCard nodes={network.nodes} activeThisWeek={network.activeThisWeek} onOpen={setOpenId} />
         <OutreachCard days={week.days} total={week.total} />
         <div className="flex flex-col gap-4 md:row-span-2">
-          <ReplyRateCard {...funnel} />
+          <ReplyRateCard {...funnel} period={funnelPeriod} onPeriod={pickFunnelPeriod} />
           <QueueCard rows={queue.rows} done={queue.done} total={queue.total} onOpen={setOpenId} />
         </div>
         <ModulesCard />

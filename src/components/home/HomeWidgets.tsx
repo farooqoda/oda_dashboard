@@ -9,6 +9,7 @@ import {
   type NetworkNode,
   type QueueRow,
   type DayBar,
+  type FunnelPeriod,
 } from '../../lib/home';
 import { initialsOf } from '../../lib/person';
 import { fitScore } from '../../lib/traitsRegistry';
@@ -219,7 +220,29 @@ export function OutreachCard({ days, total }: { days: DayBar[]; total: number })
 // ---------------------------------------------------------------------------
 // Reply rate: Sent / Accepted / Replied
 // ---------------------------------------------------------------------------
-export function ReplyRateCard({ sent, accepted, replied, rate }: { sent: number; accepted: number; replied: number; rate: number | null }) {
+const PERIODS: Array<{ value: FunnelPeriod; label: string; text: string }> = [
+  { value: 7, label: '7d', text: 'Last 7 days' },
+  { value: 30, label: '30d', text: 'Last 30 days' },
+  { value: 90, label: '90d', text: 'Last 90 days' },
+  { value: 'all', label: 'All', text: 'All time' },
+];
+
+export function ReplyRateCard({
+  sent,
+  accepted,
+  replied,
+  rate,
+  period = 'all',
+  onPeriod,
+}: {
+  sent: number;
+  accepted: number;
+  replied: number;
+  rate: number | null;
+  period?: FunnelPeriod;
+  onPeriod?: (p: FunnelPeriod) => void;
+}) {
+  const periodText = PERIODS.find((p) => p.value === period)?.text ?? 'All time';
   const parts = [
     { label: 'Sent', value: sent, cls: 'bg-sun-400 text-ink' },
     { label: 'Accepted', value: accepted, cls: 'bg-ink text-white' },
@@ -231,6 +254,28 @@ export function ReplyRateCard({ sent, accepted, replied, rate }: { sent: number;
       <div className="flex items-start justify-between">
         <h2 className="text-xl font-bold tracking-tight text-ink">Reply rate</h2>
         <span className="text-4xl font-bold tabular-nums tracking-tight text-ink">{rate === null ? '—' : `${rate}%`}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-slate-600" data-testid="reply-rate-period">
+          {periodText} · people you first reached out to in this time
+        </p>
+        {onPeriod ? (
+          <div className="flex gap-1" role="group" aria-label="Time frame">
+            {PERIODS.map((p) => (
+              <button
+                key={String(p.value)}
+                type="button"
+                onClick={() => onPeriod(p.value)}
+                aria-pressed={p.value === period}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  p.value === period ? 'bg-ink text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="mt-4 flex items-end gap-1.5">
         {parts.map((p) => (

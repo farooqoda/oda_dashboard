@@ -101,11 +101,15 @@ export function sentThisWeek(leads: Lead[], now = new Date()): { days: DayBar[];
   const today = startOfDay(now).getTime();
   const start = today - 6 * DAY;
   const counts = new Array(7).fill(0) as number[];
-  for (const lead of leads) {
-    if (lead.send_status !== 'sent') continue;
-    const t = time(lead.send_sent_at);
-    if (t === null || t < start || t >= start + 7 * DAY) continue;
+  const add = (t: number | null) => {
+    if (t === null || t < start || t >= start + 7 * DAY) return;
     counts[Math.floor((t - start) / DAY)] += 1;
+  };
+  for (const lead of leads) {
+    // first messages, plus (v4.36.5) follow-ups and replies sent through Impact Connect
+    if (lead.send_status === 'sent' || lead.send_kind) add(time(lead.send_sent_at));
+    add(time(lead.followup_last_sent_at));
+    if (lead.reply_draft_status === 'sent') add(time(lead.reply_sent_at));
   }
   const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   return {
@@ -117,9 +121,23 @@ export function sentThisWeek(leads: Lead[], now = new Date()): { days: DayBar[];
 // ---------------------------------------------------------------------------
 // Reply rate: contacted → accepted → replied.
 // ---------------------------------------------------------------------------
-export function replyFunnel(leads: Lead[]) {
-  const contacted = leads.filter(wasContacted);
-  const accepted = contacted.filter((l) => isConnected(l) || hasReplied(l)).length;
+export type FunnelPeriod = 7 | 30 | 90 | 'all';
+
+/** When we first reached out (the first message / invite), for the reply-rate period. */
+function contactedAt(lead: Lead): number | null {
+  return time(lead.send_sent_at) ?? time(lead.created_at);
+}
+
+export function replyFunnel(leads: Lead[], period: FunnelPeriod = 'all', now = new Date()) {
+  const cutoff = period === 'all' ? null : startOfDay(now).getTime() - (period - 1) * DAY;
+  const contacted = leads.filter(wasContacted).filter((l) => {
+    if (cutoff === null) return true;
+    const t = contactedAt(l);
+    return t !== null && t >= cutoff;
+  });
+  // "Accepted" = accepted your connection request. People you messaged were already connected,
+  // so they only count here once they reply.
+  const accepted = contacted.filter((l) => (l.send_channel !== 'message' && isConnected(l)) || hasReplied(l)).length;
   const replied = contacted.filter(hasReplied).length;
   return {
     sent: contacted.length,
@@ -139,23 +157,41 @@ export interface QueueRow {
   state: 'sent' | 'waiting' | 'sending' | 'failed';
 }
 
+/** The last thing sent to this person (first message, follow-up or reply) and when. */
+export function lastSent(lead: Lead): { at: number; kind: 'first' | 'followup' | 'reply' } | null {
+  const opts: Array<{ at: number | null; kind: 'first' | 'followup' | 'reply' }> = [
+    { at: lead.send_status === 'sent' || lead.send_kind ? time(lead.send_sent_at) : null, kind: 'first' },
+    { at: time(lead.followup_last_sent_at), kind: 'followup' },
+    { at: lead.reply_draft_status === 'sent' ? time(lead.reply_sent_at) : null, kind: 'reply' },
+  ];
+  let best: { at: number; kind: 'first' | 'followup' | 'reply' } | null = null;
+  for (const o of opts) if (o.at !== null && (!best || o.at > best.at)) best = { at: o.at, kind: o.kind };
+  return best;
+}
+
 export function messageQueue(leads: Lead[], now = new Date()): { rows: QueueRow[]; done: number; total: number } {
   const today = startOfDay(now).getTime();
   const kind = (l: Lead) => (l.send_channel === 'message' ? 'Chat message' : 'Connection note');
+  const sentKind = (l: Lead, k: 'first' | 'followup' | 'reply') => (k === 'reply' ? 'Reply' : k === 'followup' ? 'Follow-up' : kind(l));
   const sentToday: QueueRow[] = [];
   const open: QueueRow[] = [];
+  const sentAt = new Map<number, number>();
   for (const lead of leads) {
     const s = lead.send_status;
-    if (s === 'sent') {
-      const t = time(lead.send_sent_at);
-      if (t !== null && t >= today) sentToday.push({ lead, name: displayName(lead), kind: kind(lead), state: 'sent' });
+    // v4.36.5: replies and follow-ups sent today count too (not only first messages)
+    const last = lastSent(lead);
+    if (last && last.at >= today && !(s === 'queued' || s === 'sending')) {
+      sentToday.push({ lead, name: displayName(lead), kind: sentKind(lead, last.kind), state: 'sent' });
+      sentAt.set(lead.id, last.at);
+    } else if (s === 'sent') {
+      continue;
     } else if (s === 'queued' || s === 'sending' || s === 'failed') {
       open.push({ lead, name: displayName(lead), kind: kind(lead), state: s === 'queued' ? 'waiting' : s });
     }
   }
   const qt = (r: QueueRow) => time(r.lead.send_queued_at) ?? 0;
   open.sort((a, b) => qt(a) - qt(b));
-  sentToday.sort((a, b) => (time(b.lead.send_sent_at) ?? 0) - (time(a.lead.send_sent_at) ?? 0));
+  sentToday.sort((a, b) => (sentAt.get(b.lead.id) ?? 0) - (sentAt.get(a.lead.id) ?? 0));
   return { rows: [...sentToday, ...open], done: sentToday.length, total: sentToday.length + open.filter((r) => r.state !== 'failed').length };
 }
 
