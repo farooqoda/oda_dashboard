@@ -383,6 +383,21 @@ export function statusText(s: Pick<AutopilotStatus, 'status' | 'detail'>): { tex
     case 'error':
       return { text: `The extension could not reach the server (${d}). It tries again in 5 minutes.`, tone: 'bad' };
     case 'waiting': {
+      // v4.36.2: the extension says which task Autopilot waits for ("busy:inbox_check")
+      if (d.startsWith('busy:')) {
+        const task: Record<string, string> = {
+          messages: 'Message Studio is sending',
+          comments: 'the Comment Assistant is posting',
+          profile_sync: 'People Search is syncing profiles',
+          people_search: 'People Search is collecting a search',
+          engagers: 'post engagers are being collected',
+          posts: 'posts are being collected',
+          reply_check: 'the extension is looking for new comments to reply to',
+          inbox_check: 'the inbox check is reading your LinkedIn messages and new connections',
+        };
+        const what = task[d.slice(5)] ?? 'another task is running on LinkedIn';
+        return { text: `Waiting: ${what}. Autopilot runs as soon as that finishes (one LinkedIn task at a time keeps your account safe).`, tone: 'warn' };
+      }
       const why: Record<string, string> = {
         off: 'Autopilot is switched off.',
         no_signals: 'No active keyword or creator yet.',
