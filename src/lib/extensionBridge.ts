@@ -88,6 +88,15 @@ export function useExtensionTask() {
   return { status, task, version, pending, refused, chooseTask, recheck };
 }
 
+/** v4.36.4: something was queued (messages, replies, follow-ups): the extension's ⚡ panels check at once. */
+export function kickWork() {
+  try {
+    window.postMessage({ source: 'gab-dashboard', type: 'work-kick' }, window.location.origin);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** v4.33: wake Autopilot on LinkedIn at once (settings saved / Run now). Older extensions ignore it. */
 export function kickAutopilot() {
   try {

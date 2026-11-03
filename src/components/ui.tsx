@@ -40,6 +40,13 @@ export function TypePill({ type }: { type: string | null | undefined }) {
   return <span className={`pill ${typePillClass(type)}`}>{type}</span>;
 }
 
+/** v4.36.4: connection status, separate from the pipeline stage */
+export function ConnectionPill({ status }: { status: string | null | undefined }) {
+  const s = status || 'Not connected';
+  const tone = /^connected$/i.test(s) ? 'bg-emerald-50 text-emerald-800 ring-emerald-200' : /invite|pending/i.test(s) ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-slate-50 text-slate-600 ring-slate-200';
+  return <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${tone}`}>{/^connected$/i.test(s) ? '🔗 Connected' : /invite|pending/i.test(s) ? '✉️ Invite sent' : 'Not connected'}</span>;
+}
+
 export function StagePill({ stage }: { stage: string | null | undefined }) {
   if (!stage) return null;
   return <span className={`pill ${stagePillClass(stage)}`}>{stage}</span>;

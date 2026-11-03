@@ -55,7 +55,8 @@ export function todayItems(leads: Lead[], userId: string | null, s: AutomationSe
       });
     }
   }
-  const accepted = mine.filter((l) => l.connected_detected_at && now - new Date(l.connected_detected_at).getTime() < DAY).length;
+  // v4.36.4: only people we sent a connection request to (a chat message to an existing connection is not an acceptance)
+  const accepted = mine.filter((l) => l.connected_detected_at && l.send_channel !== 'message' && now - new Date(l.connected_detected_at).getTime() < DAY).length;
   if (accepted) items.push({ key: 'accepted', icon: '🤝', tone: 'slate', count: accepted, to: '/outreach?tab=sent', text: `${accepted} invite${accepted === 1 ? ' was' : 's were'} accepted in the last day` });
   return items;
 }

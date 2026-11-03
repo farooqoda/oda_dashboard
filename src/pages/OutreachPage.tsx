@@ -9,6 +9,7 @@ import {
   InlineError,
   PageHeader,
   SkeletonCards,
+  ConnectionPill,
   StagePill,
   TypePill,
 } from '../components/ui';
@@ -16,13 +17,13 @@ import { useAuth } from '../data/AuthProvider';
 import { InboxCheckLine, SafetyBanner, useAutomation } from '../components/Automation';
 import { FollowupList } from '../components/FollowupsPanel';
 import { AutoStartNotice } from '../components/Today';
-import { draftNow, isFirstMessage, isFollowupItem, isReplyItem } from '../lib/followups';
+import { draftNow, isFollowupItem, isReplyItem } from '../lib/followups';
 import { useLeads } from '../data/LeadsProvider';
 import { CHAT_CHAR_LIMIT, DEFAULT_STAGE } from '../lib/constants';
 import { useInviteLimit } from '../lib/prompts';
 import { LanguagePickers, Translation } from '../components/Languages';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useExtensionTask } from '../lib/extensionBridge';
+import { kickWork, useExtensionTask } from '../lib/extensionBridge';
 import { displayName, formatDate, formatDateTime, stageOf } from '../lib/format';
 import {
   cancelQueuedLeads,
@@ -48,9 +49,11 @@ const TABS: Array<{ key: TabKey; label: string; match: (l: Lead) => boolean }> =
   {
     key: 'send',
     label: 'To send',
-    match: (l) => sendStatusOf(l) === 'none' && !!l.invite_message?.trim() && stageOf(l) === DEFAULT_STAGE,
+    // v4.36.4: leads without a note are listed too (they can be sent without a note, or get a note written)
+    match: (l) => sendStatusOf(l) === 'none' && stageOf(l) === DEFAULT_STAGE,
   },
-  { key: 'queue', label: 'Queued', match: (l) => ['queued', 'sending'].includes(sendStatusOf(l)) && isFirstMessage(l) },
+  // v4.36.4: every queued item (first messages, approved replies and follow-ups), not only first messages
+  { key: 'queue', label: 'Queued', match: (l) => ['queued', 'sending'].includes(sendStatusOf(l)) },
   { key: 'sent', label: 'Sent', match: (l) => sendStatusOf(l) === 'sent' },
   { key: 'failed', label: 'Failed', match: (l) => sendStatusOf(l) === 'failed' },
   { key: 'skipped', label: 'Skipped', match: (l) => sendStatusOf(l) === 'skipped' },
@@ -187,7 +190,9 @@ function LeadRow({
   const chatOver = chat.length > CHAT_CHAR_LIMIT;
   const chatBusy = lead.chat_status === 'draft_requested' || lead.chat_status === 'drafting';
   const hasLink = /^https:\/\//i.test(lead.linkedin_url || '');
-  const canSend = editable && hasLink && note.trim().length > 0 && !noteOver && !chatOver;
+  // v4.36.4: an empty note is allowed: the extension sends the connection request without a note
+  const canSend = editable && hasLink && !noteOver && !chatOver;
+  const noNote = !note.trim();
 
   return (
     <article className="card p-4">
@@ -223,7 +228,7 @@ function LeadRow({
               <TypePill type={personalityType(lead.traits)} />
               <StagePill stage={stageOf(lead)} />
             </div>
-            {lead.connection_status ? <p className="mt-1 text-[11px] text-slate-500">{lead.connection_status}</p> : null}
+            <ConnectionPill status={lead.connection_status} />
             {lead.reply_snippet ? (
               <p className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] text-emerald-900" title={lead.reply_snippet}>
                 💬 Replied{lead.reply_detected_at ? ` ${formatDate(lead.reply_detected_at)}` : ''}: “{lead.reply_snippet.replace(/^[^:]{1,40}:\s*/, '').slice(0, 90)}
@@ -250,11 +255,20 @@ function LeadRow({
           ) : null}
           {status === 'sent' ? (
             <p className="text-xs text-emerald-800">
-              Sent {lead.send_channel === 'message' ? 'as a chat message' : 'as a connection request with note'}
+              Sent {lead.send_channel === 'message' ? 'as a chat message' : lead.invite_message?.trim() ? 'as a connection request with note' : 'as a connection request'}
               {lead.send_sent_at ? ` · ${formatDateTime(lead.send_sent_at)}` : ''}
             </p>
           ) : null}
 
+          {lead.send_kind && (status === 'queued' || status === 'sending') ? (
+            <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-sky-800">
+                {lead.send_kind === 'reply' ? 'Your approved reply' : 'Your approved follow-up'} — waiting to be sent
+              </p>
+              <p className="whitespace-pre-wrap break-words">{(lead.send_kind === 'reply' ? lead.reply_draft : lead.followup_draft) || ''}</p>
+            </div>
+          ) : (
+          <>
           <div>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <p className="label">Connection note (not connected yet)</p>
@@ -322,13 +336,15 @@ function LeadRow({
               </p>
             ) : null}
           </div>
+          </>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 lg:w-44 lg:flex-col lg:items-stretch">
           {editable ? (
             <button type="button" className="btn-primary" disabled={busy || !canSend} onClick={() => onAction('send')}
               title={!hasLink ? 'This lead has no LinkedIn link' : undefined}>
-              {status === 'none' ? 'Send' : 'Try again'}
+              {status === 'none' ? (noNote ? 'Send without note' : 'Send') : noNote ? 'Try again (no note)' : 'Try again'}
             </button>
           ) : null}
           {status === 'failed' ? (
@@ -418,7 +434,6 @@ export function OutreachPage() {
       return (
         ['none', 'failed', 'skipped'].includes(st) &&
         /^https:\/\//i.test(l.linkedin_url || '') &&
-        note.length > 0 &&
         note.length <= inviteLimit &&
         chat.length <= CHAT_CHAR_LIMIT
       );
@@ -581,8 +596,14 @@ export function OutreachPage() {
       return next;
     });
     setSelected(new Set());
-    setQueuedNotice(res.data);
+    onQueued(res.data);
+  };
+
+  // v4.36.4: after anything is queued, the extension switches to Message Studio and (with ⚡ on) starts at once
+  const onQueued = (n: number) => {
+    setQueuedNotice(n);
     if (extension.status === 'connected') extension.chooseTask('message_sender');
+    window.setTimeout(kickWork, 800);
     refresh();
   };
 
@@ -697,9 +718,9 @@ export function OutreachPage() {
       {queuedNotice ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>
-            {queuedNotice} {queuedNotice === 1 ? 'lead is' : 'leads are'} queued.{' '}
+            {queuedNotice} {queuedNotice === 1 ? 'message is' : 'messages are'} queued (see the Queued tab).{' '}
             {extension.status === 'connected'
-              ? 'Your extension is now set to Message Studio. Open LinkedIn and press Start in the Message Studio panel.'
+              ? 'Your extension is now set to Message Studio. With ⚡ ticked in its panel on LinkedIn, sending starts within a minute; otherwise press Start there.'
               : 'Open LinkedIn with the extension and choose Message Studio on the Dashboard.'}
           </span>
           <span className="flex items-center gap-2">
@@ -817,6 +838,7 @@ export function OutreachPage() {
             followupTotal={followupTotal}
             onChanged={refresh}
             onOpen={setOpenId}
+            onQueued={onQueued}
           />
         </div>
       ) : visible.length === 0 ? (
