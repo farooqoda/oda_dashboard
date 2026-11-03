@@ -99,7 +99,8 @@ export function rewriteReply(ids: number[]) {
 
 /** You answered on LinkedIn yourself: take it off the list. */
 export function replyHandled(ids: number[]) {
-  return update(ids, { reply_draft_status: 'sent' }, (q) => q.in('reply_draft_status', ['none', 'drafted', 'failed', 'redraft']).not('send_status', 'in', '(queued,sending)'));
+  // v4.36.5: counts as answered now (Sent tab, today's count), and clears an old send error
+  return update(ids, { reply_draft_status: 'sent', reply_sent_at: new Date().toISOString(), send_error: null }, (q) => q.in('reply_draft_status', ['none', 'drafted', 'failed', 'redraft']).not('send_status', 'in', '(queued,sending)'));
 }
 
 export function unqueueReply(ids: number[]) {
