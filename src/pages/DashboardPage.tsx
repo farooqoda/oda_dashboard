@@ -28,12 +28,12 @@ import {
   PageHeader,
 } from '../components/ui';
 import { useLeads } from '../data/LeadsProvider';
-import { displayName, formatDate, pluralise, stageOf, stagePillClass } from '../lib/format';
-import { dashboardStats, stageCounts } from '../lib/selectors';
+import { displayName, formatDate, formatDateCompact, pluralise, stageOf, stagePillClass } from '../lib/format';
+import { connectedInfo, dashboardStats, inviteSentInfo, stageCounts } from '../lib/selectors';
 import { personalityType } from '../lib/traitsRegistry';
 import type { Lead } from '../lib/types';
 
-function LeadCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
+function LeadCard({ lead, onOpen, note }: { lead: Lead; onOpen: () => void; note?: string | null }) {
   const type = personalityType(lead.traits);
   const created = formatDate(lead.created_at);
   return (
@@ -56,7 +56,11 @@ function LeadCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {type ? <TypePill type={type} /> : null}
-            {created ? <span className="text-[11px] tabular-nums text-slate-500">{created}</span> : null}
+            {note ? (
+              <span className="text-[11px] font-medium tabular-nums text-slate-700">{note}</span>
+            ) : created ? (
+              <span className="text-[11px] tabular-nums text-slate-500">{created}</span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -122,6 +126,64 @@ export function DashboardPage() {
     }
     return map;
   }, [leads, stages]);
+
+  // Connection requests: sent and waiting / accepted. Shown as two extra columns after "Contacted";
+  // these people also stay in their stage column.
+  const invites = useMemo(() => {
+    const t = (v: string | null) => (v ? new Date(v).getTime() || 0 : 0);
+    const waiting: Lead[] = [];
+    const accepted: Lead[] = [];
+    for (const lead of leads) {
+      const inv = inviteSentInfo(lead);
+      if (!inv.yes) continue;
+      if (connectedInfo(lead).yes) accepted.push(lead);
+      else waiting.push(lead);
+    }
+    waiting.sort((a, b) => t(inviteSentInfo(b).at) - t(inviteSentInfo(a).at));
+    accepted.sort((a, b) => t(connectedInfo(b).at) - t(connectedInfo(a).at));
+    const total = waiting.length + accepted.length;
+    return { waiting, accepted, total, rate: total ? Math.round((accepted.length / total) * 100) : null };
+  }, [leads]);
+
+  const boardColumns = useMemo(() => {
+    type Col = { key: string; title: string; hint?: string; cls: string; cards: Lead[]; note?: (l: Lead) => string | null; empty: string };
+    const cols: Col[] = stages.map((row) => ({
+      key: row.stage,
+      title: row.stage,
+      cls: stagePillClass(row.stage),
+      cards: byStage.get(row.stage) ?? [],
+      empty: 'No leads at this stage',
+    }));
+    const extra: Col[] = [
+      {
+        key: '__invite_sent',
+        title: 'Invite sent',
+        hint: 'Connection request sent, not accepted yet',
+        cls: 'border-amber-200 bg-amber-50 text-amber-900',
+        cards: invites.waiting,
+        note: (l) => {
+          const at = inviteSentInfo(l).at;
+          return `✉️ Invite sent${at ? ' ' + (formatDateCompact(at) ?? '') : ''}`;
+        },
+        empty: 'No invites waiting',
+      },
+      {
+        key: '__connected',
+        title: 'Connected',
+        hint: 'Accepted your connection request',
+        cls: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+        cards: invites.accepted,
+        note: (l) => {
+          const at = connectedInfo(l).at;
+          return `🔗 Accepted${at ? ' ' + (formatDateCompact(at) ?? '') : ''}`;
+        },
+        empty: 'Nobody has accepted yet',
+      },
+    ];
+    const after = cols.findIndex((c) => c.key === 'Contacted');
+    cols.splice(after === -1 ? Math.min(1, cols.length) : after + 1, 0, ...extra);
+    return cols;
+  }, [stages, byStage, invites]);
 
   const listView = useMemo(
     () =>
@@ -233,6 +295,10 @@ export function DashboardPage() {
             <span className="text-xs text-slate-500">
               {stages.length} {pluralise(stages.length, 'stage')}
             </span>
+            <span className="text-xs font-medium text-slate-700" data-testid="invite-summary">
+              · Invites sent: {invites.total} · Accepted: {invites.accepted.length}
+              {invites.rate !== null ? ` (${invites.rate}%)` : ''} · Waiting: {invites.waiting.length}
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* The board is wider than the viewport at every realistic window
@@ -295,14 +361,17 @@ export function DashboardPage() {
             className={`overflow-x-auto pb-2 ${refreshing ? 'is-refreshing' : ''}`}
           >
             <div className="flex min-w-max gap-4">
-              {stages.map((row) => {
-                const cards = byStage.get(row.stage) ?? [];
+              {boardColumns.map((col) => {
+                const cards = col.cards;
                 return (
-                  <section key={row.stage} className="w-72 shrink-0">
-                    <header className={`mb-3 flex items-center justify-between rounded-md border px-3 py-2 ${stagePillClass(row.stage)}`}>
-                      <h3 className="truncate text-sm font-semibold" title={row.stage}>
-                        {row.stage}
-                      </h3>
+                  <section key={col.key} className="w-72 shrink-0" data-column={col.title}>
+                    <header className={`mb-3 flex items-center justify-between rounded-md border px-3 py-2 ${col.cls}`} title={col.hint}>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold" title={col.hint ?? col.title}>
+                          {col.title}
+                        </h3>
+                        {col.hint ? <p className="truncate text-[11px] font-normal opacity-80">{col.hint}</p> : null}
+                      </div>
                       <span className="text-xs font-semibold tabular-nums opacity-80">
                         {cards.length}
                       </span>
@@ -312,11 +381,11 @@ export function DashboardPage() {
                     <div className="max-h-[calc(100vh-20rem)] min-h-[6rem] space-y-3 overflow-y-auto pr-1">
                       {cards.length === 0 ? (
                         <p className="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-400">
-                          No leads at this stage
+                          {col.empty}
                         </p>
                       ) : (
                         cards.map((lead) => (
-                          <LeadCard key={lead.id} lead={lead} onOpen={() => setOpenId(lead.id)} />
+                          <LeadCard key={lead.id} lead={lead} onOpen={() => setOpenId(lead.id)} note={col.note ? col.note(lead) : null} />
                         ))
                       )}
                     </div>
