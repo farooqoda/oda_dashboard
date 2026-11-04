@@ -95,7 +95,7 @@ export function TraitRow({ trait }: { trait: ResolvedTrait }) {
   }
   return (
     <div>
-      <p className="label">{trait.label}</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-brand-700">{trait.label}</p>
       {trait.hint ? <p className="mb-1 mt-0.5 text-xs text-slate-500">{trait.hint}</p> : null}
       <div className="mt-1">
         <TraitValue trait={trait} />

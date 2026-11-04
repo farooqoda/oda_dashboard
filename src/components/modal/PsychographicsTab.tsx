@@ -37,7 +37,8 @@ export function PsychographicsTab({ lead }: { lead: Lead }) {
           that the rest of the tab then breaks into fields. */}
       {detail ? (
         <section>
-          <h3 className="mb-3 border-b border-slate-200 pb-2 text-sm font-semibold text-slate-900">
+          <h3 className="mb-3 flex items-center gap-2 border-b-2 border-brand-200 pb-2 text-base font-bold text-ink">
+            <span aria-hidden className="h-4 w-1 rounded-full bg-brand-500" />
             Detailed response
           </h3>
           <DetailedAnalysis traits={lead.traits} />
@@ -46,7 +47,8 @@ export function PsychographicsTab({ lead }: { lead: Lead }) {
 
       {groups.map((block) => (
         <section key={block.group}>
-          <h3 className="mb-4 border-b border-slate-200 pb-2 text-sm font-semibold text-slate-900">
+          <h3 className="mb-4 flex items-center gap-2 border-b-2 border-brand-200 pb-2 text-base font-bold text-ink">
+            <span aria-hidden className="h-4 w-1 rounded-full bg-brand-500" />
             {block.label}
             {block.group === 'other' ? (
               <span className="ml-2 text-xs font-normal text-slate-500">

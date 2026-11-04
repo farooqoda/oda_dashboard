@@ -47,12 +47,12 @@ export function DetailedAnalysis({ traits }: { traits: TraitsRecord | null | und
 
       {nextStep ? (
         <div>
-          <p className="label">Recommended next step</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Recommended next step</p>
           <p className="mt-1 leading-relaxed text-slate-700">{nextStep}</p>
         </div>
       ) : null}
 
-      {detail ? <Markdown text={detail} /> : null}
+      {detail ? <Markdown text={detail} structure /> : null}
     </div>
   );
 }

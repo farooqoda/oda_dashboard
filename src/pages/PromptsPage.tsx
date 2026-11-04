@@ -257,6 +257,9 @@ function LeadPromptSets({ userId, clientId, inviteLimit }: { userId: string; cli
                 LinkedIn limit below.
               </p>
               <textarea id="ps-invite" className="input mt-2 min-h-[140px] leading-relaxed" placeholder={INVITE_HINT} {...field('invite_instructions')} />
+              <p className="mt-1 text-right text-[11px] tabular-nums text-slate-400" data-testid="invite-instr-count">
+                {draft.invite_instructions.length.toLocaleString()} characters
+              </p>
             </div>
 
             {error ? <InlineError error={error} /> : null}
@@ -423,6 +426,9 @@ function ChatPrompt({ userId, clientId }: { userId: string; clientId: string | n
         placeholder={CHAT_HINT}
         disabled={!loaded}
       />
+      <p className="mt-1 text-right text-[11px] tabular-nums text-slate-400" data-testid="chat-prompt-count">
+        {prompt.length.toLocaleString()} characters
+      </p>
       {error ? <div className="mt-3"><InlineError error={error} /></div> : null}
       <div className="mt-3 flex items-center gap-3">
         <button type="button" className="btn-primary" onClick={() => void save()} disabled={busy || !loaded || prompt === initial}>
