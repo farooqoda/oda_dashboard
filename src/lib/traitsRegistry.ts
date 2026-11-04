@@ -244,6 +244,11 @@ export const TRAIT_DEFINITIONS: Record<string, TraitDefinition> = {
     group: 'assessment',
     surface: 'outreach',
   },
+  // ver35 of the profiler: the Step-12 relationship score, worked out in code (0–3 each, out of 15).
+  // Drawn by <DetailedAnalysis> as one card, so `detail` keeps them out of the groups.
+  relationship_total: { label: 'Relationship score', type: 'short', group: 'assessment', surface: 'detail' },
+  relationship_interpretation: { label: 'Relationship interpretation', type: 'short', group: 'assessment', surface: 'detail' },
+  relationship_scores: { label: 'Relationship factors', type: 'short', group: 'assessment', surface: 'detail' },
   detailed_response: {
     // The long-form write-up the profiling prompt produced. Its structure is
     // the client's, not ours — headings one row, bare bullets the next — so it
@@ -596,6 +601,30 @@ export function detailedResponse(traits: TraitsRecord | null | undefined): strin
 
 export function priority(traits: TraitsRecord | null | undefined): string | null {
   return traitString(traits, 'priority');
+}
+
+/** ver35: the relationship score card (null when the prompt has no Step-12 score). */
+export interface RelationshipScore {
+  total: number;
+  interpretation: string | null;
+  factors: Array<{ label: string; value: number }>;
+}
+const RELATIONSHIP_FACTORS: Array<[string, string]> = [
+  ['fit_with_organization', 'Fit with an organization'],
+  ['access_to_relevant_audience', 'Access to a relevant audience'],
+  ['decision_making_authority', 'Decision-making authority'],
+  ['referral_potential', 'Referral potential'],
+  ['immediate_need_or_timing', 'Immediate need or timing'],
+];
+export function relationshipScore(traits: TraitsRecord | null | undefined): RelationshipScore | null {
+  if (!traits) return null;
+  const total = Number((traits as Record<string, unknown>).relationship_total);
+  if (!Number.isFinite(total)) return null;
+  const raw = (traits as Record<string, unknown>).relationship_scores;
+  const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const factors = RELATIONSHIP_FACTORS.map(([key, label]) => ({ label, value: Number(obj[key]) }))
+    .filter((f) => Number.isFinite(f.value));
+  return { total, interpretation: traitString(traits, 'relationship_interpretation'), factors };
 }
 
 export function recommendedNextStep(traits: TraitsRecord | null | undefined): string | null {
