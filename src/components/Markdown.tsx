@@ -1,4 +1,5 @@
 import ReactMarkdown, { type Components } from 'react-markdown';
+import { structureAnalysis } from '../lib/analysisText';
 
 /**
  * MARKDOWN FOR MODEL-AUTHORED TEXT
@@ -19,10 +20,14 @@ import ReactMarkdown, { type Components } from 'react-markdown';
  */
 
 const COMPONENTS: Components = {
-  h1: (props) => <h1 className="mt-4 mb-2 text-xl font-bold text-slate-900" {...props} />,
-  h2: (props) => <h2 className="mt-4 mb-2 text-lg font-bold text-slate-900" {...props} />,
-  h3: (props) => <h3 className="mt-3 mb-1 text-base font-bold text-slate-800" {...props} />,
-  h4: (props) => <h4 className="mt-3 mb-1 text-sm font-bold text-slate-800" {...props} />,
+  // Headings stand apart from the body by size, weight, colour and a rule or accent bar,
+  // so a section title never reads like the text under it.
+  h1: (props) => <h1 className="mb-3 mt-6 border-b-2 border-brand-200 pb-2 text-xl font-bold text-ink first:mt-0" {...props} />,
+  h2: (props) => <h2 className="mb-3 mt-6 border-b-2 border-brand-200 pb-2 text-lg font-bold text-ink first:mt-0" {...props} />,
+  h3: (props) => (
+    <h3 className="mb-2 mt-6 rounded-r-md border-l-4 border-brand-500 bg-brand-50 py-1.5 pl-3 text-[15px] font-bold text-brand-800 first:mt-0" {...props} />
+  ),
+  h4: (props) => <h4 className="mb-1.5 mt-4 text-sm font-bold uppercase tracking-wide text-brand-700 first:mt-0" {...props} />,
   h5: (props) => (
     <h5 className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-slate-600" {...props} />
   ),
@@ -66,12 +71,12 @@ const COMPONENTS: Components = {
   hr: (props) => <hr className="my-4 border-slate-200" {...props} />,
 };
 
-export function Markdown({ text, className = '' }: { text: string; className?: string }) {
+export function Markdown({ text, className = '', structure = false }: { text: string; className?: string; structure?: boolean }) {
   if (!text.trim()) return null;
 
   return (
-    <div className={`prose prose-sm max-w-none text-sm ${className}`.trim()}>
-      <ReactMarkdown components={COMPONENTS}>{text}</ReactMarkdown>
+    <div className={`prose prose-sm max-w-none text-sm ${className}`.trim()} data-testid="markdown">
+      <ReactMarkdown components={COMPONENTS}>{structure ? structureAnalysis(text) : text}</ReactMarkdown>
     </div>
   );
 }
