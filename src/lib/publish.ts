@@ -3,7 +3,8 @@ import { POST_WRITER_WEBHOOK, PUBLISH_NOW_WEBHOOK } from './constants';
 import { supabase, supabaseConfigError, toFriendlyError, type FriendlyError } from './supabase';
 
 /** Batch E: posts on the member's own LinkedIn profile through LinkedIn's official API. */
-export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+export type PostStatus = 'draft' | 'review' | 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+export type ImageStatus = 'none' | 'pending' | 'ready' | 'failed';
 export interface ScheduledPost {
   id: number;
   body: string;
@@ -14,6 +15,15 @@ export interface ScheduledPost {
   error: string | null;
   published_at: string | null;
   created_at: string;
+  // Batch O (content autopilot); absent before that database step
+  origin?: 'manual' | 'auto';
+  plan_note?: string | null;
+  image_status?: ImageStatus;
+  image_source?: 'ai' | 'stock' | null;
+  image_prompt?: string | null;
+  image_id?: number | null;
+  image_alt?: string | null;
+  image_error?: string | null;
 }
 export interface LinkedInConnection {
   name: string | null;
@@ -81,15 +91,20 @@ export async function disconnectLinkedIn(): Promise<FriendlyError | null> {
   return error ? toFriendlyError(error) : null;
 }
 
-export async function loadPosts(): Promise<Result<ScheduledPost[]>> {
+const POST_COLS = 'id, body, scheduled_at, tz, status, post_url, error, published_at, created_at';
+const POST_COLS_O = POST_COLS + ', origin, plan_note, image_status, image_source, image_prompt, image_id, image_alt, image_error';
+/** Posts; `autopilot` = the Batch O columns are there (pictures, "To review"). */
+export async function loadPosts(): Promise<Result<ScheduledPost[]> & { autopilot?: boolean }> {
   if (!supabase) return { data: null, error: cfgErr() };
-  const { data, error } = await supabase
-    .from('gab_scheduled_posts')
-    .select('id, body, scheduled_at, tz, status, post_url, error, published_at, created_at')
-    .order('scheduled_at', { ascending: false })
-    .limit(300);
+  const q = (cols: string) => supabase!.from('gab_scheduled_posts').select(cols).order('scheduled_at', { ascending: false }).limit(300);
+  let { data, error } = await q(POST_COLS_O);
+  let autopilot = true;
+  if (error && (error.code === '42703' || /column .* does not exist/i.test(error.message ?? ''))) {
+    autopilot = false;
+    ({ data, error } = await q(POST_COLS));
+  }
   if (error) return isMissing(error) ? { data: null, error: null, missing: true } : { data: null, error: toFriendlyError(error) };
-  return { data: (data as ScheduledPost[]) ?? [], error: null };
+  return { data: ((data as unknown) as ScheduledPost[]) ?? [], error: null, autopilot };
 }
 
 export interface PostDraft {

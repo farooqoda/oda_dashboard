@@ -1,5 +1,8 @@
 import { LanguagePickers, Translation } from '../components/Languages';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ContentAutopilot } from '../components/publish/ContentAutopilot';
+import { PictureBox } from '../components/publish/PictureBox';
+import { approvePost, loadImages, rejectPost, saveReview, stockPhotosReady, type PostImage } from '../lib/contentPlan';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAutomation } from '../components/Automation';
 import { Card, EmptyState, ErrorState, InlineError, PageHeader, SkeletonCards } from '../components/ui';
@@ -453,27 +456,139 @@ function Composer({
 // The list
 // ---------------------------------------------------------------------------
 const TABS: Array<[string, string, (p: ScheduledPost) => boolean]> = [
+  ['review', 'To review', (p) => p.status === 'review'],
   ['scheduled', 'Scheduled', (p) => p.status === 'scheduled' || p.status === 'publishing'],
   ['draft', 'Drafts', (p) => p.status === 'draft' || p.status === 'cancelled'],
   ['published', 'Published', (p) => p.status === 'published'],
   ['failed', 'Failed', (p) => p.status === 'failed'],
 ];
 
+// A post the AI wrote: read it, change the text, time or picture, then approve or reject it
+function ReviewItem({
+  post,
+  tz,
+  connected,
+  images,
+  dataUrl,
+  stockReady,
+  onChanged,
+}: {
+  post: ScheduledPost;
+  tz: string;
+  connected: boolean;
+  images: PostImage[];
+  dataUrl: string | null;
+  stockReady: boolean | null;
+  onChanged: (msg?: string) => void;
+}) {
+  const [body, setBody] = useState(post.body);
+  const [slot, setSlot] = useState(() => utcToZoned(post.scheduled_at, tz));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<FriendlyError | null>(null);
+  const when = slot.date && slot.time ? zonedToUtc(slot.date, slot.time, tz) : null;
+  const past = !!when && when.getTime() < Date.now() + 60000;
+  const tooLong = body.length > MAX_POST;
+  const picturePending = post.image_status === 'pending';
+  const changed = body !== post.body || (when ? when.toISOString() !== new Date(post.scheduled_at).toISOString() : false);
+  const run = async (f: () => Promise<FriendlyError | null>, msg: string) => {
+    setBusy(true);
+    setErr(null);
+    const e = await f();
+    setBusy(false);
+    if (e) return setErr(e);
+    onChanged(msg);
+  };
+  return (
+    <li className="py-4" data-testid={`review-${post.id}`}>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">✨ Written by AI</span>
+        {post.plan_note ? <span className="text-slate-600">{post.plan_note}</span> : null}
+      </div>
+      <textarea
+        className="input min-h-[180px] w-full font-[inherit] text-sm leading-relaxed"
+        aria-label="Post text"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+      />
+      <div className="mt-1 flex justify-between text-xs">
+        <span className={tooLong ? 'font-medium text-red-700' : 'text-slate-500'}>
+          {body.length.toLocaleString()} / {MAX_POST.toLocaleString()}
+        </span>
+      </div>
+      <div className="mt-2">
+        <PictureBox post={post} images={images} dataUrl={dataUrl} stockReady={stockReady} onChanged={() => onChanged()} compact={post.image_status === 'ready'} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-3 text-sm">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500">Day</span>
+          <input type="date" className="input w-auto py-1.5" value={slot.date} onChange={(e) => setSlot((s) => ({ ...s, date: e.target.value }))} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500">Time ({tz})</span>
+          <input type="time" className="input w-auto py-1.5" value={slot.time} onChange={(e) => setSlot((s) => ({ ...s, time: e.target.value }))} />
+        </label>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={busy || !body.trim() || tooLong || past || !when || !connected || picturePending}
+            onClick={() => void run(() => approvePost(post.id, body, when!.toISOString(), tz), `Approved: it goes out ${formatInZone(when!.toISOString(), tz)}.`)}
+          >
+            Approve & schedule
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={busy || !changed || !body.trim() || tooLong || !when}
+            onClick={() => void run(() => saveReview(post.id, body, when!.toISOString(), tz), 'Changes saved. It is still waiting for your approval.')}
+          >
+            Save changes
+          </button>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(() => rejectPost(post.id), 'Rejected. It moved to Drafts.')}>
+            Reject
+          </button>
+        </div>
+      </div>
+      {past ? <p className="mt-1 text-xs text-red-700">That time has passed. Pick a later time to approve it.</p> : null}
+      {picturePending ? <p className="mt-1 text-xs text-slate-500">Approve once the picture is ready (or choose No picture).</p> : null}
+      {!connected ? <p className="mt-1 text-xs text-amber-800">Connect LinkedIn above to approve posts.</p> : null}
+      {err ? (
+        <div className="mt-2">
+          <InlineError error={err} title="Not saved" />
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 function PostList({
   posts,
   tz,
   onEdit,
   onChanged,
+  autopilot = false,
+  connected = false,
+  images = {},
+  imageData = {},
+  stockReady = null,
 }: {
   posts: ScheduledPost[];
   tz: string;
   onEdit: (p: ScheduledPost) => void;
-  onChanged: () => void;
+  onChanged: (msg?: string) => void;
+  autopilot?: boolean;
+  connected?: boolean;
+  images?: Record<number, PostImage[]>;
+  imageData?: Record<number, string>;
+  stockReady?: boolean | null;
 }) {
-  const [tab, setTab] = useState(() => (posts.some((p) => p.status === 'failed') ? 'failed' : 'scheduled'));
+  const tabs = autopilot ? TABS : TABS.filter((t) => t[0] !== 'review');
+  const [tab, setTab] = useState(() =>
+    posts.some((p) => p.status === 'failed') ? 'failed' : autopilot && posts.some((p) => p.status === 'review') ? 'review' : 'scheduled',
+  );
   const [err, setErr] = useState<FriendlyError | null>(null);
   const show = TABS.find((t) => t[0] === tab)![2];
-  const rows = posts.filter(show).sort((a, b) => (tab === 'scheduled' ? a.scheduled_at.localeCompare(b.scheduled_at) : b.scheduled_at.localeCompare(a.scheduled_at)));
+  const rows = posts.filter(show).sort((a, b) => (tab === 'scheduled' || tab === 'review' ? a.scheduled_at.localeCompare(b.scheduled_at) : b.scheduled_at.localeCompare(a.scheduled_at)));
   const act = async (f: () => Promise<FriendlyError | null>) => {
     setErr(null);
     const e = await f();
@@ -483,7 +598,7 @@ function PostList({
   return (
     <Card title="Your posts">
       <div role="tablist" className="mb-4 flex flex-wrap gap-1">
-        {TABS.map(([k, label, f]) => {
+        {tabs.map(([k, label, f]) => {
           const n = posts.filter(f).length;
           return (
             <button
@@ -494,7 +609,7 @@ function PostList({
               className={`rounded-full px-3 py-1.5 text-sm ${tab === k ? 'bg-ink text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
               onClick={() => setTab(k)}
             >
-              {label} {n ? <span className={k === 'failed' && tab !== k ? 'font-semibold text-red-700' : ''}>({n})</span> : null}
+              {label} {n ? <span className={(k === 'failed' || k === 'review') && tab !== k ? 'font-semibold text-red-700' : ''}>({n})</span> : null}
             </button>
           );
         })}
@@ -504,9 +619,24 @@ function PostList({
           <InlineError error={err} />
         </div>
       ) : null}
-      {rows.length === 0 ? (
+      {tab === 'review' && rows.length ? (
+        <ul className="divide-y divide-slate-100">
+          {rows.map((p) => (
+            <ReviewItem
+              key={p.id + ':' + p.scheduled_at}
+              post={p}
+              tz={tz}
+              connected={connected}
+              images={images[p.id] ?? []}
+              dataUrl={p.image_id ? imageData[p.image_id] ?? null : null}
+              stockReady={stockReady}
+              onChanged={onChanged}
+            />
+          ))}
+        </ul>
+      ) : rows.length === 0 ? (
         <p className="text-sm text-slate-500">
-          {tab === 'scheduled' ? 'Nothing scheduled. Write a post above and pick a time.' : tab === 'draft' ? 'No drafts.' : tab === 'published' ? 'Nothing published yet.' : 'Nothing failed.'}
+          {tab === 'review' ? 'Nothing to review. Content autopilot puts the AI’s posts here.' : tab === 'scheduled' ? 'Nothing scheduled. Write a post above and pick a time.' : tab === 'draft' ? 'No drafts.' : tab === 'published' ? 'Nothing published yet.' : 'Nothing failed.'}
         </p>
       ) : (
         <ul className="divide-y divide-slate-100">
@@ -517,12 +647,26 @@ function PostList({
                   {p.status === 'published' && p.published_at ? formatInZone(p.published_at, tz) : formatInZone(p.scheduled_at, tz)}
                 </p>
                 <p>
-                  {p.status === 'publishing' ? 'Posting…' : p.status === 'published' ? 'Published' : p.status === 'failed' ? 'Failed' : p.status === 'scheduled' ? 'Scheduled' : 'Draft'}
+                  {p.status === 'publishing' ? 'Posting…' : p.status === 'published' ? 'Published' : p.status === 'failed' ? 'Failed' : p.status === 'scheduled' ? 'Scheduled' : p.status === 'cancelled' ? 'Rejected' : 'Draft'}
                 </p>
+                {p.origin === 'auto' ? <p className="text-[11px] text-violet-700">✨ Written by AI</p> : null}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="line-clamp-3 whitespace-pre-line text-sm text-slate-800">{p.body}</p>
                 {p.status === 'failed' && p.error ? <p className="mt-1 text-xs text-red-700">{p.error}</p> : null}
+                {p.status === 'draft' && p.origin === 'auto' && p.error ? <p className="mt-1 text-xs text-amber-800">{p.error}</p> : null}
+                {autopilot && p.status !== 'cancelled' && (p.status !== 'published' || (p.image_status ?? 'none') !== 'none') ? (
+                  <div className="mt-2">
+                    <PictureBox
+                      post={p}
+                      images={images[p.id] ?? []}
+                      dataUrl={p.image_id ? imageData[p.image_id] ?? null : null}
+                      stockReady={stockReady}
+                      onChanged={() => onChanged()}
+                      compact
+                    />
+                  </div>
+                ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 {p.status === 'published' && p.post_url ? (
@@ -574,7 +718,11 @@ export function PublishPage() {
   const [error, setError] = useState<FriendlyError | null>(null);
   const [editing, setEditing] = useState<ScheduledPost | null>(null);
   const [note, setNote] = useState('');
+  const [autopilot, setAutopilot] = useState(false);
+  const [stockReady, setStockReady] = useState<boolean | null>(null);
+  const [images, setImages] = useState<{ byPost: Record<number, PostImage[]>; data: Record<number, string> }>({ byPost: {}, data: {} });
 
+  const known = useRef<Record<number, string>>({});
   const load = useCallback(async () => {
     const [s, p] = await Promise.all([loadPublishState(), loadPosts()]);
     if (s.missing || p.missing) return setMissing(true);
@@ -583,12 +731,28 @@ export function PublishPage() {
     setError(null);
     setState(s.data);
     setPosts(p.data);
+    setAutopilot(!!p.autopilot);
+    if (p.autopilot && p.data) {
+      const live = p.data.filter((x) => x.status !== 'cancelled' && (x.status !== 'published' || x.image_id));
+      const im = await loadImages(live, known.current);
+      known.current = im.data;
+      setImages(im);
+    }
   }, []);
+  useEffect(() => {
+    if (autopilot) void stockPhotosReady().then(setStockReady);
+  }, [autopilot]);
   useEffect(() => {
     void load();
   }, [load]);
   // while something is going out, look again every few seconds
-  const busy = useMemo(() => (posts ?? []).some((p) => p.status === 'publishing' || (p.status === 'scheduled' && new Date(p.scheduled_at).getTime() <= Date.now())), [posts]);
+  const busy = useMemo(
+    () =>
+      (posts ?? []).some(
+        (p) => p.status === 'publishing' || (p.status === 'scheduled' && new Date(p.scheduled_at).getTime() <= Date.now()) || p.image_status === 'pending',
+      ),
+    [posts],
+  );
   useEffect(() => {
     if (!busy) return;
     const t = setInterval(() => void load(), 5000);
@@ -609,6 +773,7 @@ export function PublishPage() {
       ) : (
         <div className="space-y-6">
           <ConnectionCard ready={state.ready} conn={state.connection} onChanged={() => void load()} />
+          {autopilot ? <ContentAutopilot tz={tz} stockReady={stockReady} onPlanned={() => void load()} /> : null}
           {note ? (
             <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900" role="status">
               {note}
@@ -626,14 +791,23 @@ export function PublishPage() {
             }}
           />
           <PostList
+            key={autopilot ? 'o' : 'e'}
             posts={posts}
             tz={tz}
+            autopilot={autopilot}
+            connected={connected}
+            images={images.byPost}
+            imageData={images.data}
+            stockReady={stockReady}
             onEdit={(p) => {
               setEditing(p);
               setNote('');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onChanged={() => void load()}
+            onChanged={(msg) => {
+              if (msg) setNote(msg);
+              void load();
+            }}
           />
         </div>
       )}
