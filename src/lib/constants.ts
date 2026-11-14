@@ -134,3 +134,5 @@ export const CONTENT_PLAN_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/content
 export const POST_IMAGES_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/post-images-run';
 /** Batch E2: translations into the member's own language (cached in the database). `{ user_id, target, texts[] }` → `{ ok, translations[] }`. */
 export const TRANSLATE_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/translate';
+/** Batch P: Settings → Billing. `{ ticket }` (one-time, from ic_billing_ticket) → `{ ok, url }` of the member's Stripe Customer Portal. */
+export const BILLING_PORTAL_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/ic-billing-portal';

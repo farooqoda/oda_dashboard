@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AutomationCard, MorningEmailCard } from '../components/Automation';
+import { BillingCard } from '../components/BillingCard';
 import { MyLimitsCard } from '../components/Limits';
 import { PaceCard } from '../components/PaceCard';
 import { Card, CopyButton, PageHeader } from '../components/ui';
@@ -372,7 +373,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Your account, working hours and account safety." />
+      <PageHeader title="Settings" description="Your account, billing, working hours and account safety." />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Your account">
@@ -426,53 +427,57 @@ export function SettingsPage() {
           </button>
         </Card>
 
-        <Card title="System">
-          <div className="divide-y divide-slate-100">
-            <Row
-              label="System status"
-              value={
-                <span
-                  className={`pill ${
-                    connected
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                      : 'border-red-200 bg-red-50 text-red-800'
-                  }`}
-                >
+        <div className="space-y-6">
+          <Card title="System">
+            <div className="divide-y divide-slate-100">
+              <Row
+                label="System status"
+                value={
                   <span
-                    aria-hidden="true"
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: connected ? '#0ca30c' : '#d03b3b' }}
-                  />
-                  {connected ? 'Connected' : 'Unavailable'}
-                </span>
-              }
-            />
-          </div>
+                    className={`pill ${
+                      connected
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                        : 'border-red-200 bg-red-50 text-red-800'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: connected ? '#0ca30c' : '#d03b3b' }}
+                    />
+                    {connected ? 'Connected' : 'Unavailable'}
+                  </span>
+                }
+              />
+            </div>
 
-          {!connected ? (
-            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
-              Your lead data could not be reached just now. Try reloading the page; if it keeps
-              happening, contact support with the time you saw this.
-            </p>
-          ) : null}
+            {!connected ? (
+              <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                Your lead data could not be reached just now. Try reloading the page; if it keeps
+                happening, contact support with the time you saw this.
+              </p>
+            ) : null}
 
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <p className="text-sm text-slate-600">
-              Need help, a new invite code, or a change to your account? Contact{' '}
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
-                className="font-medium text-brand-700 underline underline-offset-2"
-              >
-                {SUPPORT_EMAIL}
-              </a>
-              .
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Lead profiling, message generation and account provisioning all run outside this
-              dashboard and are not configurable here.
-            </p>
-          </div>
-        </Card>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="text-sm text-slate-600">
+                Need help, a new invite code, or a change to your account? Contact{' '}
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  className="font-medium text-brand-700 underline underline-offset-2"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+                .
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Lead profiling, message generation and account provisioning all run outside this
+                dashboard and are not configurable here.
+              </p>
+            </div>
+          </Card>
+
+          <BillingCard />
+        </div>
 
         <div className="space-y-6 lg:col-span-2">
           <MyLimitsCard />
