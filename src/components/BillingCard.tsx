@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isTrial, loadBilling, openBillingPortal, planLabel, statusLabel, type Billing } from '../lib/billing';
+import { cancelsOn, fmtDay, isTrial, loadBilling, openBillingPortal, planLabel, statusLabel, type Billing } from '../lib/billing';
 import { SUPPORT_EMAIL } from '../lib/constants';
 import type { FriendlyError } from '../lib/supabase';
 import { Card, InlineError } from './ui';
@@ -42,6 +42,7 @@ export function BillingCard() {
   const st = billing ? statusLabel(billing) : null;
   const trial = billing ? isTrial(billing) : false;
   const ended = st?.tone === 'off';
+  const ends = billing ? cancelsOn(billing) : null;
 
   return (
     <Card title="Billing" description="Your plan, and where to cancel, change your card or download invoices.">
@@ -73,7 +74,12 @@ export function BillingCard() {
                 {st.text}
               </span>
             </div>
-            {billing.expiry_date ? (
+            {ends ? (
+              <div className="flex items-center justify-between gap-4 py-2">
+                <span className="text-slate-500">Access until</span>
+                <span className="font-medium text-slate-900" data-testid="billing-date">{fmtDay(ends)}</span>
+              </div>
+            ) : billing.expiry_date ? (
               <div className="flex items-center justify-between gap-4 py-2">
                 <span className="text-slate-500">{ended ? 'Access until' : trial ? 'Free trial ends' : 'Current period ends'}</span>
                 <span className="font-medium text-slate-900" data-testid="billing-date">{fmt(billing.expiry_date)}</span>
@@ -91,7 +97,13 @@ export function BillingCard() {
                 access until the end of the period you paid for and you are not charged again.
                 {trial ? ' A free trial cancelled before it ends is never charged.' : ''}
               </p>
-              {st.tone === 'warn' ? (
+              {ends ? (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" data-testid="billing-cancelled-note">
+                  Your subscription is cancelled. You keep access until {fmtDay(ends)} and you will not be charged again. Changed your mind?
+                  You can renew it on the billing page before then.
+                </p>
+              ) : null}
+              {st.tone === 'warn' && !ends ? (
                 <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   Your last payment did not go through. Update your card on the billing page to keep your access.
                 </p>

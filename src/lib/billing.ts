@@ -12,6 +12,8 @@ export interface Billing {
   status: string | null;
   expiry_date: string | null;
   signed_up_at: string | null;
+  /** Batch P2: set when the member cancelled in Stripe and the subscription ends at this time (null otherwise). */
+  cancel_at: string | null;
   has_subscription: boolean;
 }
 
@@ -36,6 +38,7 @@ export async function loadBilling(): Promise<{ data: Billing | null; missing: bo
       status: b.status ?? null,
       expiry_date: b.expiry_date ?? null,
       signed_up_at: b.signed_up_at ?? null,
+      cancel_at: b.cancel_at ?? null,
       has_subscription: !!b.has_subscription,
     },
     missing: false,
@@ -58,12 +61,36 @@ export function planLabel(b: Billing): string {
   return period ? `${plan} · ${period}` : plan;
 }
 
+/** The day a cancelled-but-still-paid subscription ends, or null (not cancelled, or already over). */
+export function cancelsOn(b: Billing): Date | null {
+  if (!b.cancel_at) return null;
+  const d = new Date(b.cancel_at);
+  if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) return null;
+  return d;
+}
+
+export function fmtDay(d: Date): string {
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export function statusLabel(b: Billing): { text: string; tone: 'ok' | 'warn' | 'off' } {
   const s = (b.status ?? '').toLowerCase();
   if (s === 'canceled' || s === 'cancelled') return { text: 'Cancelled', tone: 'off' };
   if (s === 'past_due') return { text: 'Payment problem', tone: 'warn' };
   if (s === 'expired' || s === 'inactive' || s === 'suspended') return { text: 'Not active', tone: 'off' };
+  const ends = cancelsOn(b);
+  if (ends) return { text: `Cancels on ${fmtDay(ends)}`, tone: 'warn' };
   return { text: isTrial(b) ? 'Free trial' : 'Active', tone: 'ok' };
+}
+
+/** Only Stripe's own billing pages are opened, whatever the webhook returns. */
+export function isStripePortal(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && u.hostname === 'billing.stripe.com';
+  } catch {
+    return false;
+  }
 }
 
 /** Asks for a one-time ticket, then for the portal link. Returns the link to open, or a plain-words error. */
@@ -93,7 +120,7 @@ export async function openBillingPortal(): Promise<{ url: string | null; error: 
     };
   }
   const body = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; message?: string; error?: string } | null;
-  if (body?.ok && typeof body.url === 'string' && /^https:\/\//.test(body.url)) return { url: body.url, error: null };
+  if (body?.ok && typeof body.url === 'string' && isStripePortal(body.url)) return { url: body.url, error: null };
   return {
     url: null,
     error: { message: body?.message ?? `The billing page did not open (HTTP ${res.status}).`, hint: 'Please try again. If it keeps happening, contact support.', code: body?.error ?? 'BILLING' },
