@@ -1,14 +1,20 @@
 name: Deploy to GitHub Pages
 
 on:
+  # The repo has no `main`; the default (live) branch is this one. Merging a PR into it deploys.
   push:
-    branches: [main]
+    branches: [claude/linkedin-outreach-dashboard-77u3yj]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+# Two merges close together: the newer one waits, a deploy already running is never cut off.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
