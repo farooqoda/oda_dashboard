@@ -1,3 +1,4 @@
+import { ODA_URL, PRIVACY_URL, TERMS_URL } from '../lib/constants';
 import { BrandLogo } from './Brand';
 import type { ReactNode } from 'react';
 import type { FriendlyError } from '../lib/supabase';
@@ -34,6 +35,20 @@ export function AuthLayout({
         </div>
 
         {footer ? <div className="auth-footer mt-4 text-center text-sm text-slate-600">{footer}</div> : null}
+        <p className="mt-4 text-center text-xs text-slate-500" data-testid="legal-footer">
+          Operated by{' '}
+          <a href={ODA_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-700">
+            Ontario Digital Academy
+          </a>
+          {' · '}
+          <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-700">
+            Privacy
+          </a>
+          {' · '}
+          <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-700">
+            Terms
+          </a>
+        </p>
       </div>
     </div>
   );

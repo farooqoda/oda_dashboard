@@ -136,3 +136,7 @@ export const POST_IMAGES_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/post-ima
 export const TRANSLATE_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/translate';
 /** Batch P: Settings → Billing. `{ ticket }` (one-time, from ic_billing_ticket) → `{ ok, url }` of the member's Stripe Customer Portal. */
 export const BILLING_PORTAL_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/ic-billing-portal';
+/** Legal links on the sign-in pages (needed for the LinkedIn Community Management API review). */
+export const ODA_URL = 'https://ontariodigitalacademy.org';
+export const PRIVACY_URL = 'https://impactinnovationhub.com/privacy';
+export const TERMS_URL = 'https://impactinnovationhub.com/terms';
