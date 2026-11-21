@@ -1,7 +1,7 @@
 import { LanguagePickers, Translation } from '../components/Languages';
 import { ContentAutopilot } from '../components/publish/ContentAutopilot';
 import { PictureBox } from '../components/publish/PictureBox';
-import { approvePost, loadImages, rejectPost, saveReview, stockPhotosReady, type PostImage } from '../lib/contentPlan';
+import { approvePost, loadImages, rejectPost, requestPlanNow, saveReview, stockPhotosReady, type PostImage } from '../lib/contentPlan';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAutomation } from '../components/Automation';
@@ -481,6 +481,7 @@ function ReviewItem({
   stockReady: boolean | null;
   onChanged: (msg?: string) => void;
 }) {
+  const { user } = useAuth();
   const [body, setBody] = useState(post.body);
   const [slot, setSlot] = useState(() => utcToZoned(post.scheduled_at, tz));
   const [busy, setBusy] = useState(false);
@@ -546,6 +547,21 @@ function ReviewItem({
           </button>
           <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(() => rejectPost(post.id), 'Rejected. It moved to Drafts.')}>
             Reject
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={busy || !user}
+            title="Reject this post and let the AI write a new one for a free day"
+            onClick={() =>
+              void run(async () => {
+                const e = await rejectPost(post.id);
+                if (e) return e;
+                return requestPlanNow(user!.id);
+              }, 'Rejected. A new post for a free day will appear in To review in a minute or two.')
+            }
+          >
+            ↻ Regenerate
           </button>
         </div>
       </div>
