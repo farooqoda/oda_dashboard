@@ -107,6 +107,7 @@ function TeamDetails({
   client,
   showChart,
   showLimits,
+  limitUsers,
 }: {
   rows: ActivityRow[];
   daily: DailyRow[];
@@ -114,6 +115,7 @@ function TeamDetails({
   client: string;
   showChart: boolean;
   showLimits: boolean;
+  limitUsers?: string[];
 }) {
   const total = sum(rows);
   const byClient = new Map<string, ActivityRow[]>();
@@ -184,7 +186,7 @@ function TeamDetails({
               </section>
             );
           })}
-          {showLimits ? <MemberLimitsCard client={client} /> : null}
+          {showLimits ? <div id="daily-limits"><MemberLimitsCard client={client} userIds={limitUsers} /></div> : null}
           <p className="text-xs text-slate-500">
             Counts are people, not messages (someone who got two follow-ups counts once). “Status now”, failed, queued and “to approve”
             are right now; everything else is for the dates chosen. Time saved assumes by hand: 3 min a profile, 2 an invite, 3 a
@@ -500,7 +502,10 @@ export function TeamPage() {
               onOpen={(k) => setView({ mode: 'one', keys: [k] })}
               onCombine={(keys) => setView(keys ? { mode: 'some', keys } : { mode: 'all', keys: [] })}
             />
-            <p className="text-xs text-slate-500">Numbers are for the dates chosen above; “Status now” is right now.</p>
+            <p className="mb-6 text-xs text-slate-500">Numbers are for the dates chosen above; “Status now” is right now.</p>
+            <div id="daily-limits">
+              <MemberLimitsCard client={client} />
+            </div>
           </>
         ) : (
           <>
@@ -517,9 +522,17 @@ export function TeamPage() {
               </p>
             </div>
             {view.mode !== 'all' ? (
-              <p className="mb-4 text-xs text-slate-500">The day-by-day chart and member limits are on the “Everyone together” view.</p>
+              <p className="mb-4 text-xs text-slate-500">The day-by-day chart is on the “Everyone together” view.</p>
             ) : null}
-            <TeamDetails rows={shownRows} daily={daily} admin={admin} client={client} showChart={view.mode === 'all'} showLimits={view.mode === 'all'} />
+            <TeamDetails
+              rows={shownRows}
+              daily={daily}
+              admin={admin}
+              client={client}
+              showChart={view.mode === 'all'}
+              showLimits
+              limitUsers={view.mode === 'all' ? undefined : shownRows.map((m) => m.user_id)}
+            />
           </>
         )
       )}
