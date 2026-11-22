@@ -118,7 +118,7 @@ function LimitRow({ m, onSaved }: { m: MemberLimit; onSaved: (m: MemberLimit) =>
   );
 }
 
-export function MemberLimitsCard({ client }: { client: string }) {
+export function MemberLimitsCard({ client, userIds }: { client: string; userIds?: string[] }) {
   const [rows, setRows] = useState<MemberLimit[] | null>(null);
   const [missing, setMissing] = useState(false);
   const [error, setError] = useState<FriendlyError | null>(null);
@@ -133,7 +133,7 @@ export function MemberLimitsCard({ client }: { client: string }) {
   }, [load]);
 
   if (missing) return null;
-  const shown = (rows ?? []).filter((r) => !client || r.client_id === client);
+  const shown = (rows ?? []).filter((r) => (!client || r.client_id === client) && (!userIds || userIds.includes(r.user_id)));
   const hourly = shown.some((r) => typeof r.comment_hourly_limit === 'number');
   const byClient = new Map<string, MemberLimit[]>();
   for (const r of shown) byClient.set(r.client_id, [...(byClient.get(r.client_id) ?? []), r]);
