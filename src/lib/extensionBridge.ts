@@ -20,6 +20,8 @@ interface ExtensionMessage {
   type: 'mode';
   mode: Task;
   version?: string;
+  /** v4.36.17: which copy answered: the Chrome extension or the Tampermonkey script */
+  copy?: string;
 }
 
 function isExtensionMessage(data: unknown): data is ExtensionMessage {
@@ -34,17 +36,26 @@ export function useExtensionTask() {
   const [status, setStatus] = useState<ExtensionStatus>('checking');
   const [task, setTask] = useState<Task | null>(null);
   const [version, setVersion] = useState<string | null>(null);
+  const [copy, setCopy] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState<string | null>(null);
   const [pending, setPending] = useState<Task | null>(null);
   const connected = useRef(false);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
+      // v4.36.17: a second copy (extension + Tampermonkey script) says it is here too
+      const dup = event.data as { source?: string; type?: string; copy?: string } | null;
+      if (dup && dup.source === 'gab-extension' && dup.type === 'duplicate') {
+        setDuplicate(dup.copy ?? 'another copy');
+        return;
+      }
       if (!isExtensionMessage(event.data)) return;
       connected.current = true;
       setStatus('connected');
       setTask(event.data.mode);
       setVersion(event.data.version ?? null);
+      setCopy(event.data.copy ?? null);
       setPending(null);
     };
     window.addEventListener('message', onMessage);
@@ -85,7 +96,7 @@ export function useExtensionTask() {
     }, DETECT_TIMEOUT_MS);
   }, []);
 
-  return { status, task, version, pending, refused, chooseTask, recheck };
+  return { status, task, version, copy, duplicate, pending, refused, chooseTask, recheck };
 }
 
 /** v4.36.4: something was queued (messages, replies, follow-ups): the extension's ⚡ panels check at once. */
