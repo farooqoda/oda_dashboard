@@ -22,20 +22,27 @@ const NAV = [
 ];
 
 function ExtensionPill() {
-  const { status, recheck } = useExtensionTask();
-  const dot = status === 'connected' ? 'bg-good' : status === 'missing' ? 'bg-warning' : 'bg-slate-400';
-  const text =
-    status === 'connected' ? 'Extension connected' : status === 'missing' ? 'Extension not detected' : 'Checking extension…';
+  const { status, recheck, copy, duplicate } = useExtensionTask();
+  // a second copy (Chrome extension + Tampermonkey script) is also active: they do not share the chosen task or the clicks
+  const twice = status === 'connected' && !!duplicate;
+  const dot = twice ? 'bg-warning' : status === 'connected' ? 'bg-good' : status === 'missing' ? 'bg-warning' : 'bg-slate-400';
+  const text = twice
+    ? 'Two copies of Impact Connect are running'
+    : status === 'connected'
+      ? copy === 'userscript' ? 'Tampermonkey script connected' : 'Extension connected'
+      : status === 'missing' ? 'Extension not detected' : 'Checking extension…';
   return (
     <button
       type="button"
       onClick={status === 'missing' ? recheck : undefined}
-      title={status === 'missing' ? 'Extension not detected — click to check again' : text}
+      title={twice
+        ? 'The Chrome extension and the Tampermonkey script are both on, and they do not share the chosen task or the button clicks. Switch one off (chrome://extensions or the Tampermonkey icon), then refresh this page.'
+        : status === 'missing' ? 'Extension not detected — click to check again' : text}
       className="hidden items-center gap-2 rounded-full border border-slate-200/80 bg-white/85 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm sm:inline-flex"
     >
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
       {/* short form on narrower screens so the bar fits on one line */}
-      <span className="whitespace-nowrap 2xl:hidden">{status === 'connected' ? 'Connected' : status === 'missing' ? 'Not detected' : 'Checking…'}</span>
+      <span className="whitespace-nowrap 2xl:hidden">{twice ? 'Two copies' : status === 'connected' ? 'Connected' : status === 'missing' ? 'Not detected' : 'Checking…'}</span>
       <span className="hidden whitespace-nowrap 2xl:inline">{text}</span>
     </button>
   );
