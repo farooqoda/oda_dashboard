@@ -10,6 +10,9 @@ import {
   isMissingAutopilot,
   forgetReadyCount,
   hasPhase2,
+  hasTarget,
+  LINKEDIN_INDUSTRIES,
+  TARGET_COUNTRIES,
   loadWarmLeads,
   loadAutopilotSettings,
   loadAutopilotStatus,
@@ -44,6 +47,141 @@ function olderThan(version: string | null, min: number[]): boolean {
     if ((v[i] ?? 0) !== min[i]) return (v[i] ?? 0) < min[i];
   }
   return false;
+}
+
+const GATE_TEXT: Record<'fit' | 'not_fit' | 'unsure', { text: string; cls: string }> = {
+  fit: { text: 'Fits your target', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  unsure: { text: 'Unsure', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+  not_fit: { text: 'Not a fit', cls: 'bg-slate-50 text-slate-600 border-slate-200' },
+};
+
+const splitList = (s: string) => s.split(',').map((t) => t.trim()).filter(Boolean);
+
+/** Lead engine (25 Nov 2026): the member's ideal client. Keyword searches only show posts by these authors, and the AI checks
+ *  every person against it before they reach the list. */
+function TargetCard({ settings, busy, onSave }: {
+  settings: AutopilotSettings;
+  busy: string | null;
+  onSave: (patch: AutopilotPatch, key: string) => Promise<void>;
+}) {
+  const known = (id: number) => LINKEDIN_INDUSTRIES.some((x) => x.id === id);
+  const [countries, setCountries] = useState<string[]>(settings.ap_target_countries);
+  const [business, setBusiness] = useState(settings.ap_target_business);
+  const [roles, setRoles] = useState(settings.ap_target_roles);
+  const [about, setAbout] = useState(settings.ap_target_about);
+  const [titles, setTitles] = useState(settings.ap_author_titles);
+  const [inds, setInds] = useState<number[]>(settings.ap_author_industries.filter(known));
+  const [otherIds, setOtherIds] = useState(settings.ap_author_industries.filter((id) => !known(id)).join(', '));
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setCountries(settings.ap_target_countries);
+    setBusiness(settings.ap_target_business);
+    setRoles(settings.ap_target_roles);
+    setAbout(settings.ap_target_about);
+    setTitles(settings.ap_author_titles);
+    setInds(settings.ap_author_industries.filter(known));
+    setOtherIds(settings.ap_author_industries.filter((id) => !known(id)).join(', '));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  const extra = splitList(otherIds).map((t) => Number(t)).filter((n) => Number.isInteger(n) && n > 0);
+  const allIds = Array.from(new Set([...inds, ...extra]));
+  const titleList = splitList(titles);
+  const tooManyTitles = titleList.length > 8;
+  const tooManyIds = allIds.length > 10;
+  const badOther = splitList(otherIds).some((t) => !/^[0-9]{1,6}$/.test(t));
+  const now = JSON.stringify([countries, business.trim(), roles.trim(), about.trim(), titleList.join(', '), allIds]);
+  const was = JSON.stringify([settings.ap_target_countries, settings.ap_target_business.trim(), settings.ap_target_roles.trim(),
+    settings.ap_target_about.trim(), splitList(settings.ap_author_titles).join(', '), settings.ap_author_industries]);
+  const changed = now !== was;
+  const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+  const chip = (on: boolean) =>
+    `rounded-full border px-3 py-1 text-xs font-medium ${on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`;
+
+  return (
+    <Card
+      className="mt-6"
+      title="Who you want to reach"
+      description="Your ideal client. Keyword searches only show posts written by these people, and the AI checks every person against it before they reach your list. Empty fields mean no filter."
+    >
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <label htmlFor="tg-about" className="flex flex-col gap-1 lg:col-span-2">
+          <span className="label">What you sell (one or two sentences)</span>
+          <textarea id="tg-about" className="input min-h-[4.5rem]" maxLength={500} value={about} onChange={(e) => { setAbout(e.target.value); setDone(false); }}
+            placeholder="e.g. AI that answers missed calls, replies to new leads in seconds and books the job." />
+        </label>
+        <label htmlFor="tg-business" className="flex flex-col gap-1">
+          <span className="label">Business types you sell to</span>
+          <input id="tg-business" className="input" maxLength={300} value={business} onChange={(e) => { setBusiness(e.target.value); setDone(false); }}
+            placeholder="e.g. plumbing, HVAC, roofing, cleaning" />
+          <span className="text-xs text-slate-500">Separate with commas.</span>
+        </label>
+        <label htmlFor="tg-roles" className="flex flex-col gap-1">
+          <span className="label">Who decides (roles)</span>
+          <input id="tg-roles" className="input" maxLength={200} value={roles} onChange={(e) => { setRoles(e.target.value); setDone(false); }}
+            placeholder="e.g. owner, founder, general manager" />
+          <span className="text-xs text-slate-500">Separate with commas.</span>
+        </label>
+        <fieldset className="flex flex-col gap-2 lg:col-span-2">
+          <legend className="label mb-1">Countries</legend>
+          <div className="flex flex-wrap gap-2">
+            {TARGET_COUNTRIES.map((c) => (
+              <button key={c} type="button" className={chip(countries.includes(c))} aria-pressed={countries.includes(c)}
+                onClick={() => { setCountries(toggle(countries, c)); setDone(false); }}>{c}</button>
+            ))}
+          </div>
+          <span className="text-xs text-slate-500">LinkedIn cannot filter posts by country; the AI check uses them, and People Search will too.</span>
+        </fieldset>
+        <label htmlFor="tg-titles" className="flex flex-col gap-1 lg:col-span-2">
+          <span className="label">Only posts written by people with these job titles</span>
+          <input id="tg-titles" className="input" maxLength={300} value={titles} onChange={(e) => { setTitles(e.target.value); setDone(false); }}
+            placeholder="e.g. Owner, Founder, President, CEO, General Manager" />
+          <span className={`text-xs ${tooManyTitles ? 'text-red-700' : 'text-slate-500'}`}>
+            Separate with commas, up to 8. LinkedIn matches any of them (Author keywords filter).
+          </span>
+        </label>
+        <fieldset className="flex flex-col gap-2 lg:col-span-2">
+          <legend className="label mb-1">Only posts written by people in these LinkedIn industries</legend>
+          <div className="flex flex-wrap gap-2">
+            {LINKEDIN_INDUSTRIES.map((x) => (
+              <button key={x.id} type="button" className={chip(inds.includes(x.id))} aria-pressed={inds.includes(x.id)}
+                onClick={() => { setInds(toggle(inds, x.id)); setDone(false); }}>{x.label}</button>
+            ))}
+          </div>
+          <label htmlFor="tg-other" className="mt-1 flex flex-col gap-1 sm:max-w-md">
+            <span className="text-xs text-slate-600">Other industry ids (LinkedIn Industry Codes V2)</span>
+            <input id="tg-other" className="input" maxLength={80} value={otherIds} onChange={(e) => { setOtherIds(e.target.value); setDone(false); }} placeholder="e.g. 44, 13" />
+          </label>
+          <span className={`text-xs ${tooManyIds || badOther ? 'text-red-700' : 'text-slate-500'}`}>
+            Up to 10 industries in total{badOther ? '; other ids must be numbers' : ''}.{' '}
+            <a className="underline" href="https://learn.microsoft.com/en-us/linkedin/shared/references/reference-tables/industry-codes-v2" target="_blank" rel="noopener noreferrer">LinkedIn's list</a>
+          </span>
+        </fieldset>
+      </div>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={!changed || tooManyTitles || tooManyIds || badOther || busy === 'target'}
+          onClick={async () => {
+            await onSave({
+              ap_target_about: about.trim(),
+              ap_target_business: business.trim(),
+              ap_target_roles: roles.trim(),
+              ap_target_countries: countries,
+              ap_author_titles: titleList.join(', '),
+              ap_author_industries: allIds,
+              ap_target_updated_at: new Date().toISOString(),
+            }, 'target');
+            setDone(true);
+          }}
+        >
+          {busy === 'target' ? 'Saving…' : 'Save target'}
+        </button>
+        {done && !changed ? <span className="text-xs text-emerald-700">Saved. The next search uses it.</span> : null}
+      </div>
+    </Card>
+  );
 }
 
 const STATUS_TEXT: Record<AutopilotLead['status'], { text: string; cls: string }> = {
@@ -264,7 +402,10 @@ export function AutopilotPage() {
 
   const titles = useMemo(() => Object.fromEntries((signals ?? []).map((s) => [s.id, signalTitle(s)])), [signals]);
   const activeCount = (signals ?? []).filter((s) => s.active).length;
-  const readyHigh = (leads ?? []).filter((l) => l.ready && l.lead_id !== null && (l.fit ?? 0) >= FIT_HIGH);
+  const readyHigh = (leads ?? []).filter((l) => l.ready && l.lead_id !== null && (l.fit ?? 0) >= FIT_HIGH && l.gate_verdict !== 'not_fit');
+  const [showNotFit, setShowNotFit] = useState(false);
+  const notFitCount = (leads ?? []).filter((l) => l.gate_verdict === 'not_fit').length;
+  const shownLeads = showNotFit ? leads ?? [] : (leads ?? []).filter((l) => l.gate_verdict !== 'not_fit');
 
   const save = async (patch: AutopilotPatch, key: string) => {
     if (!userId) return;
@@ -562,6 +703,8 @@ export function AutopilotPage() {
         </Card>
       </div>
 
+      {hasPhase2 && hasTarget && settings ? <TargetCard settings={settings} busy={busy} onSave={save} /> : null}
+
       <Card
         className="mt-6"
         title="Which people and how many"
@@ -747,7 +890,13 @@ export function AutopilotPage() {
         title="Latest warm leads"
         description="People Autopilot found, newest first. Once synced they get a fit score and a personal note; queue the ones you like."
         actions={
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {notFitCount ? (
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" checked={showNotFit} onChange={(e) => setShowNotFit(e.target.checked)} />
+                Show {notFitCount} marked not a fit
+              </label>
+            ) : null}
             {readyHigh.length ? (
               <button type="button" className="btn-primary px-3 py-1.5 text-xs" disabled={busy === 'q-all'} onClick={() => void queue(readyHigh, 'q-all')}>
                 {busy === 'q-all' ? 'Queuing…' : `Queue all High fit (${readyHigh.length})`}
@@ -759,17 +908,20 @@ export function AutopilotPage() {
           </div>
         }
       >
-        {leads.length === 0 ? (
+        {shownLeads.length === 0 ? (
           <p className="text-sm text-slate-500">
-            None yet. Once Autopilot is on and has something to follow, new people show up here after its first run.
+            {leads.length
+              ? `All ${leads.length} people found so far were marked not a fit by the AI check. Tick "Show ${notFitCount} marked not a fit" to see them.`
+              : 'None yet. Once Autopilot is on and has something to follow, new people show up here after its first run.'}
           </p>
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="w-full min-w-[1100px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="py-2 pr-3 font-semibold">Person</th>
                   <th className="py-2 pr-3 font-semibold">How they engaged</th>
+                  <th className="py-2 pr-3 font-semibold">AI check</th>
                   <th className="py-2 pr-3 font-semibold">Fit</th>
                   <th className="py-2 pr-3 font-semibold">Personal note</th>
                   <th className="py-2 pr-3 font-semibold">Status</th>
@@ -777,7 +929,7 @@ export function AutopilotPage() {
                 </tr>
               </thead>
               <tbody>
-                {leads.map((l) => {
+                {shownLeads.map((l) => {
                   const st = STATUS_TEXT[l.status] ?? STATUS_TEXT.new;
                   const how =
                     l.engagement_kind === 'comment'
@@ -801,6 +953,16 @@ export function AutopilotPage() {
                         {l.engagement_kind === 'comment' && l.engagement_text ? (
                           <p className="mt-0.5 line-clamp-2 italic text-slate-500">“{l.engagement_text}”</p>
                         ) : null}
+                      </td>
+                      <td className="max-w-[13rem] py-3 pr-3 text-xs">
+                        {l.gate_verdict && GATE_TEXT[l.gate_verdict] ? (
+                          <>
+                            <span className={`pill ${GATE_TEXT[l.gate_verdict].cls}`}>{GATE_TEXT[l.gate_verdict].text}</span>
+                            {l.gate_reason ? <p className="mt-1 line-clamp-2 text-slate-500">{l.gate_reason}</p> : null}
+                          </>
+                        ) : (
+                          <span className="text-slate-400">–</span>
+                        )}
                       </td>
                       <td className="py-3 pr-3">{l.lead_id ? <FitBadge score={l.fit} emptyLabel="–" /> : <span className="text-xs text-slate-400">–</span>}</td>
                       <td className="max-w-[20rem] py-3 pr-3 text-xs text-slate-700">
