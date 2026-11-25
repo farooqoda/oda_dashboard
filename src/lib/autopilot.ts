@@ -116,6 +116,42 @@ export const LINKEDIN_INDUSTRIES: { id: number; label: string }[] = [
   { id: 1916, label: 'Office Administration' },
 ];
 
+/** Lead engine Suggest (25 Nov 2026): AI ideas for the Target card from what the member sells.
+ *  The dashboard first gets a one-time ticket (signed-in members only, 30 a day); n8n redeems it before calling the AI. */
+export const TARGET_SUGGEST_WEBHOOK = 'https://n8n.fisolutionz.com/webhook/ic-target-suggest';
+export interface TargetSuggestions {
+  business_types: string[];
+  roles: string[];
+  author_titles: string[];
+  keywords: string[];
+}
+export async function suggestTarget(about: string, business: string, roles: string): Promise<Result<TargetSuggestions>> {
+  if (!supabase) return notConfigured();
+  const t = await supabase.rpc('gab_ap_suggest_ticket');
+  if (t.error) return { data: null, error: toFriendlyError(t.error) };
+  let res: Response;
+  try {
+    res = await fetch(TARGET_SUGGEST_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket: t.data, about, business, roles }),
+    });
+  } catch (cause) {
+    return { data: null, error: { message: 'The suggestion service could not be reached.', hint: cause instanceof Error ? cause.message : null, code: 'NETWORK' } };
+  }
+  const j = (await res.json().catch(() => null)) as { ok?: boolean; reason?: string; suggestions?: Partial<TargetSuggestions> } | null;
+  if (!res.ok || !j || j.ok !== true || !j.suggestions) {
+    const reason = j?.reason;
+    const message = reason === 'about_too_short' ? 'Write a little more about what you sell first.'
+      : reason === 'login' ? 'Your session ran out. Reload the page and try again.'
+      : 'No suggestions this time. Try again in a moment.';
+    return { data: null, error: { message, hint: null, code: 'SUGGEST' } };
+  }
+  const arr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
+  const s = j.suggestions;
+  return { data: { business_types: arr(s.business_types), roles: arr(s.roles), author_titles: arr(s.author_titles), keywords: arr(s.keywords) }, error: null };
+}
+
 /** Allowed ranges (the database refuses anything outside them). */
 export const AP_LIMITS = {
   ap_min_engagement: [0, 100000],
