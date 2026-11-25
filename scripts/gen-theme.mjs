@@ -1,6 +1,8 @@
 // Generates src/theme.css: every colour the app uses as a CSS variable, with a light and a dark value.
 // Light = the existing palette. Dark = the same scale mirrored (50 <-> 950, 100 <-> 900 ...), so
 // "pale background + dark text" pairs become "deep background + light text" with the same contrast.
+// Readability (24 Nov 2026): text greys are kept at WCAG contrast of at least 4.5:1 in the light theme and about 9:1 (hints) to 17:1 (main text) in the dark theme.
+// Do not dim slate-400/500 or ink-300 again: they carry the small hint and secondary text on every page.
 // Run: node scripts/gen-theme.mjs   (the output is committed; tailwind.config.js reads the variable names)
 import colors from 'tailwindcss/colors.js';
 import { writeFileSync } from 'node:fs';
@@ -21,16 +23,16 @@ export const FAMILIES = ['red', 'amber', 'emerald', 'sky', 'green', 'yellow', 'b
 export const CUSTOM = {
   // Impact Innovation Hub brand: navy #0E2850 + teal #05A3AA, cool greys (was warm grey + yellow)
   slate: {
-    light: { 50: '#f4f7fa', 100: '#ebf0f5', 200: '#dce4ec', 300: '#c5d1dd', 400: '#7d8ba0', 500: '#536179', 600: '#3b4860', 700: '#29354b', 800: '#19243a', 900: '#0e1a2e' },
-    dark:  { 50: '#0f1726', 100: '#162033', 200: '#223049', 300: '#33435f', 400: '#8394ae', 500: '#aab8cc', 600: '#c8d3e1', 700: '#dde5ef', 800: '#edf2f7', 900: '#f6f9fc' },
+    light: { 50: '#f4f7fa', 100: '#ebf0f5', 200: '#dce4ec', 300: '#c5d1dd', 400: '#5d6c84', 500: '#46546b', 600: '#323f56', 700: '#29354b', 800: '#19243a', 900: '#0e1a2e' },
+    dark:  { 50: '#0f1726', 100: '#162033', 200: '#223049', 300: '#33435f', 400: '#b4c2d6', 500: '#ccd7e5', 600: '#dce4ef', 700: '#e9eff6', 800: '#f2f6fa', 900: '#fafcfe' },
   },
   brand: {
     light: { 50: '#e6f6f7', 100: '#c9edef', 200: '#9edfe2', 300: '#5fcbd0', 400: '#3b4860', 500: '#14325e', 600: '#0e2850', 700: '#0e2850', 800: '#0b1f3f', 900: '#08162d' },
     dark:  { 50: '#0c2a30', 100: '#0f3940', 200: '#145059', 300: '#1c7a82', 400: '#c8d3e1', 500: '#2bc4ca', 600: '#eaf2f8', 700: '#7fdde1', 800: '#eaf2f8', 900: '#ffffff' },
   },
   ink: {
-    light: { DEFAULT: '#0e2850', 800: '#13305c', 700: '#1d3f70', 300: '#8fa0b8', 200: '#c9d3e0' },
-    dark:  { DEFAULT: '#eaf2f8', 800: '#dce6f0', 700: '#c5d3e2', 300: '#5d6e88', 200: '#2c3a52' },
+    light: { DEFAULT: '#0e2850', 800: '#13305c', 700: '#1d3f70', 300: '#5b6c85', 200: '#c9d3e0' },
+    dark:  { DEFAULT: '#eaf2f8', 800: '#dce6f0', 700: '#c5d3e2', 300: '#93a5bf', 200: '#2c3a52' },
   },
   // the accent (was yellow): the logo's teal
   sun: {

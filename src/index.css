@@ -150,3 +150,8 @@ html.dark .hatched {
   .card { box-shadow: none !important; break-inside: avoid; }
   @page { margin: 14mm; }
 }
+
+/* Readability (24 Nov 2026): hint text was 10-11px in about 80 places. Raise the two smallest sizes by 1px everywhere at once,
+   without editing every component. Remove this block to go back. */
+.text-\[11px\] { font-size: 12px; }
+.text-\[10px\] { font-size: 11px; }
