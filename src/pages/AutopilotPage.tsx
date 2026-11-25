@@ -11,6 +11,8 @@ import {
   forgetReadyCount,
   hasPhase2,
   hasTarget,
+  suggestTarget,
+  type TargetSuggestions,
   LINKEDIN_INDUSTRIES,
   TARGET_COUNTRIES,
   loadWarmLeads,
@@ -59,10 +61,13 @@ const splitList = (s: string) => s.split(',').map((t) => t.trim()).filter(Boolea
 
 /** Lead engine (25 Nov 2026): the member's ideal client. Keyword searches only show posts by these authors, and the AI checks
  *  every person against it before they reach the list. */
-function TargetCard({ settings, busy, onSave }: {
+function TargetCard({ settings, busy, onSave, onAddKeyword, onSuggest = suggestTarget }: {
   settings: AutopilotSettings;
   busy: string | null;
   onSave: (patch: AutopilotPatch, key: string) => Promise<void>;
+  /** Adds a keyword signal; returns an error message or null. */
+  onAddKeyword: (keyword: string) => Promise<string | null>;
+  onSuggest?: typeof suggestTarget;
 }) {
   const known = (id: number) => LINKEDIN_INDUSTRIES.some((x) => x.id === id);
   const [countries, setCountries] = useState<string[]>(settings.ap_target_countries);
@@ -73,6 +78,24 @@ function TargetCard({ settings, busy, onSave }: {
   const [inds, setInds] = useState<number[]>(settings.ap_author_industries.filter(known));
   const [otherIds, setOtherIds] = useState(settings.ap_author_industries.filter((id) => !known(id)).join(', '));
   const [done, setDone] = useState(false);
+  const [ideas, setIdeas] = useState<TargetSuggestions | null>(null);
+  const [ideasBusy, setIdeasBusy] = useState(false);
+  const [ideasError, setIdeasError] = useState<string | null>(null);
+  const [kwState, setKwState] = useState<Record<string, string>>({});
+  const askIdeas = async () => {
+    setIdeasBusy(true);
+    setIdeasError(null);
+    const r = await onSuggest(about.trim(), business.trim(), roles.trim());
+    setIdeasBusy(false);
+    if (r.error) { setIdeasError(r.error.message); return; }
+    setIdeas(r.data);
+    setKwState({});
+  };
+  const addKw = async (k: string) => {
+    setKwState((s) => ({ ...s, [k]: 'adding' }));
+    const err = await onAddKeyword(k);
+    setKwState((s) => ({ ...s, [k]: err ? err : 'added' }));
+  };
   useEffect(() => {
     setCountries(settings.ap_target_countries);
     setBusiness(settings.ap_target_business);
@@ -106,10 +129,57 @@ function TargetCard({ settings, busy, onSave }: {
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <label htmlFor="tg-about" className="flex flex-col gap-1 lg:col-span-2">
-          <span className="label">What you sell (one or two sentences)</span>
-          <textarea id="tg-about" className="input min-h-[4.5rem]" maxLength={500} value={about} onChange={(e) => { setAbout(e.target.value); setDone(false); }}
-            placeholder="e.g. AI that answers missed calls, replies to new leads in seconds and books the job." />
+          <span className="label">What you sell and who buys it</span>
+          <textarea id="tg-about" className="input min-h-[6rem]" maxLength={2000} value={about} onChange={(e) => { setAbout(e.target.value); setDone(false); }}
+            placeholder="e.g. AI that answers missed calls, replies to new leads in seconds and books the job. Best clients: owner-run plumbing and HVAC companies with 3-50 staff." />
+          <span className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <span>The more detail (services, best clients, who is not a fit), the better the AI check and the suggestions. Up to 2000 characters.</span>
+            <button type="button" className="btn-secondary px-3 py-1.5 text-xs" disabled={ideasBusy || about.trim().length < 10} onClick={() => void askIdeas()}>
+              {ideasBusy ? 'Thinking…' : 'Suggest from what I sell'}
+            </button>
+          </span>
+          {ideasError ? <span className="text-xs text-red-700">{ideasError}</span> : null}
         </label>
+        {ideas ? (
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Suggestions (nothing changes until you use them and press Save target)</p>
+            {([
+              ['Business types', ideas.business_types, () => { setBusiness(ideas.business_types.join(', ')); setDone(false); }],
+              ['Who decides', ideas.roles, () => { setRoles(ideas.roles.join(', ')); setDone(false); }],
+              ['Post authors\' job titles', ideas.author_titles, () => { setTitles(ideas.author_titles.slice(0, 8).join(', ')); setDone(false); }],
+            ] as [string, string[], () => void][]).map(([name, list, use]) => (list.length ? (
+              <div key={name} className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="w-40 shrink-0 font-medium text-slate-700">{name}</span>
+                {list.map((x) => <span key={x} className="rounded-full border border-slate-200 px-2.5 py-0.5 text-slate-700">{x}</span>)}
+                <button type="button" className="btn-secondary px-2.5 py-1 text-xs" onClick={use}>Use these</button>
+              </div>
+            ) : null))}
+            {ideas.keywords.length ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="w-40 shrink-0 font-medium text-slate-700">Keywords to follow</span>
+                {ideas.keywords.map((k) => {
+                  const st = kwState[k];
+                  return (
+                    <span key={k} className="inline-flex items-center gap-1 rounded-full border border-slate-200 py-0.5 pl-2.5 pr-1 text-slate-700">
+                      {k}
+                      {st === 'added' ? (
+                        <span className="px-1.5 text-emerald-700">✓ added</span>
+                      ) : (
+                        <button type="button" className="rounded-full px-1.5 font-semibold text-brand-700 hover:bg-brand-50" disabled={st === 'adding'}
+                          title={st && st !== 'adding' ? st : 'Add to What to follow'} onClick={() => void addKw(k)}>
+                          {st === 'adding' ? '…' : '+ Add'}
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
+            {Object.values(kwState).some((v) => v !== 'added' && v !== 'adding') ? (
+              <p className="text-xs text-red-700">{Object.values(kwState).find((v) => v !== 'added' && v !== 'adding')}</p>
+            ) : null}
+          </div>
+        ) : null}
         <label htmlFor="tg-business" className="flex flex-col gap-1">
           <span className="label">Business types you sell to</span>
           <input id="tg-business" className="input" maxLength={300} value={business} onChange={(e) => { setBusiness(e.target.value); setDone(false); }}
@@ -703,7 +773,19 @@ export function AutopilotPage() {
         </Card>
       </div>
 
-      {hasPhase2 && hasTarget && settings ? <TargetCard settings={settings} busy={busy} onSave={save} /> : null}
+      {hasPhase2 && hasTarget && settings ? (
+        <TargetCard
+          settings={settings}
+          busy={busy}
+          onSave={save}
+          onAddKeyword={async (k) => {
+            const r = await addSignal('keyword', k, 'suggested');
+            if (r.error) return r.error.message;
+            await reload();
+            return null;
+          }}
+        />
+      ) : null}
 
       <Card
         className="mt-6"
