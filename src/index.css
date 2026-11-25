@@ -23,10 +23,8 @@
     background-attachment: fixed;
   }
   html.dark body {
-    background:
-      radial-gradient(900px 520px at 100% 0%, rgba(5, 163, 170, 0.14) 0%, rgba(5, 163, 170, 0) 62%),
-      radial-gradient(800px 560px at 0% 100%, rgba(59, 100, 170, 0.10) 0%, rgba(59, 100, 170, 0) 70%),
-      #0a1220;
+    /* flat near-black, no coloured glow (25 Nov 2026) */
+    background: #111112;
     background-attachment: fixed;
   }
 
@@ -61,7 +59,7 @@
     background: linear-gradient(135deg, #0e2850 0%, #123a6b 55%, #0b6f78 100%);
   }
   html.dark .tile-dark {
-    border: 1px solid #223049; /* keeps its dark look; the border sets it apart from the dark page */
+    border: 1px solid #2e2e32; /* keeps its dark look; the border sets it apart from the dark page */
   }
 
   .pill {
@@ -139,8 +137,8 @@ html.dark input[type='radio'] {
   border: 1px solid #dce4ec;
 }
 html.dark .hatched {
-  background: repeating-linear-gradient(135deg, #131d2e 0 6px, #223049 6px 8px);
-  border-color: #223049;
+  background: repeating-linear-gradient(135deg, #1b1b1d 0 6px, #2e2e32 6px 8px);
+  border-color: #2e2e32;
 }
 
 /* I3: client reports print cleanly (Print / Save as PDF) */
