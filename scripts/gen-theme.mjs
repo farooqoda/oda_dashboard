@@ -3,6 +3,7 @@
 // "pale background + dark text" pairs become "deep background + light text" with the same contrast.
 // Readability (24 Nov 2026): text greys are kept at WCAG contrast of at least 4.5:1 in the light theme and about 9:1 (hints) to 17:1 (main text) in the dark theme.
 // Do not dim slate-400/500 or ink-300 again: they carry the small hint and secondary text on every page.
+// Dark theme (25 Nov 2026): neutral near-black greys (no navy tint), like the Claude chat background: page #111112, cards #1b1b1d.
 // Run: node scripts/gen-theme.mjs   (the output is committed; tailwind.config.js reads the variable names)
 import colors from 'tailwindcss/colors.js';
 import { writeFileSync } from 'node:fs';
@@ -24,15 +25,15 @@ export const CUSTOM = {
   // Impact Innovation Hub brand: navy #0E2850 + teal #05A3AA, cool greys (was warm grey + yellow)
   slate: {
     light: { 50: '#f4f7fa', 100: '#ebf0f5', 200: '#dce4ec', 300: '#c5d1dd', 400: '#5d6c84', 500: '#46546b', 600: '#323f56', 700: '#29354b', 800: '#19243a', 900: '#0e1a2e' },
-    dark:  { 50: '#0f1726', 100: '#162033', 200: '#223049', 300: '#33435f', 400: '#b4c2d6', 500: '#ccd7e5', 600: '#dce4ef', 700: '#e9eff6', 800: '#f2f6fa', 900: '#fafcfe' },
+    dark:  { 50: '#151516', 100: '#232325', 200: '#2e2e32', 300: '#404045', 400: '#bababf', 500: '#d0d0d4', 600: '#dfdfe2', 700: '#ebebed', 800: '#f4f4f5', 900: '#fbfbfb' },
   },
   brand: {
     light: { 50: '#e6f6f7', 100: '#c9edef', 200: '#9edfe2', 300: '#5fcbd0', 400: '#3b4860', 500: '#14325e', 600: '#0e2850', 700: '#0e2850', 800: '#0b1f3f', 900: '#08162d' },
-    dark:  { 50: '#0c2a30', 100: '#0f3940', 200: '#145059', 300: '#1c7a82', 400: '#c8d3e1', 500: '#2bc4ca', 600: '#eaf2f8', 700: '#7fdde1', 800: '#eaf2f8', 900: '#ffffff' },
+    dark:  { 50: '#0c2a30', 100: '#0f3940', 200: '#145059', 300: '#1c7a82', 400: '#d0d0d4', 500: '#2bc4ca', 600: '#f2f2f4', 700: '#7fdde1', 800: '#f2f2f4', 900: '#ffffff' },
   },
   ink: {
     light: { DEFAULT: '#0e2850', 800: '#13305c', 700: '#1d3f70', 300: '#5b6c85', 200: '#c9d3e0' },
-    dark:  { DEFAULT: '#eaf2f8', 800: '#dce6f0', 700: '#c5d3e2', 300: '#93a5bf', 200: '#2c3a52' },
+    dark:  { DEFAULT: '#f2f2f4', 800: '#e4e4e7', 700: '#d2d2d6', 300: '#a3a3ab', 200: '#323236' },
   },
   // the accent (was yellow): the logo's teal
   sun: {
@@ -43,9 +44,9 @@ export const CUSTOM = {
     light: { 50: '#eff5fd', 500: '#2a78d6', 600: '#256abf', 700: '#1c5cab', 800: '#184f95' },
     dark:  { 50: '#10233a', 500: '#5b9be6', 600: '#74abec', 700: '#93bff1', 800: '#b2d2f5' },
   },
-  white:    { light: { DEFAULT: '#ffffff' }, dark: { DEFAULT: '#131d2e' } },
-  canvas:   { light: { DEFAULT: '#edf2f6' }, dark: { DEFAULT: '#0a1220' } },
-  line:     { light: { DEFAULT: '#dce4ec' }, dark: { DEFAULT: '#223049' } },
+  white:    { light: { DEFAULT: '#ffffff' }, dark: { DEFAULT: '#1b1b1d' } },
+  canvas:   { light: { DEFAULT: '#edf2f6' }, dark: { DEFAULT: '#111112' } },
+  line:     { light: { DEFAULT: '#dce4ec' }, dark: { DEFAULT: '#2e2e32' } },
   good:     { light: { DEFAULT: '#0a8a0a' }, dark: { DEFAULT: '#4ade80' } },
   warning:  { light: { DEFAULT: '#fab219' }, dark: { DEFAULT: '#fbbf24' } },
   critical: { light: { DEFAULT: '#c62f2f' }, dark: { DEFAULT: '#f87171' } },
