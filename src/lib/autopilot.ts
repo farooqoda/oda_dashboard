@@ -50,6 +50,16 @@ export interface AutopilotSettings {
   ap_auto_queue: boolean;
   ap_auto_min_fit: number;
   ap_auto_per_run: number;
+  /** Lead engine (25 Nov 2026): who the member wants to reach. Empty = no filter. */
+  ap_target_countries: string[];
+  ap_target_business: string;
+  ap_target_roles: string;
+  ap_target_about: string;
+  /** Keyword signals only search posts written by people with these job titles (comma separated, up to 8) ... */
+  ap_author_titles: string;
+  /** ... and in these LinkedIn industries (Industry Codes V2 ids, up to 10). */
+  ap_author_industries: number[];
+  ap_target_updated_at?: string | null;
 }
 export type AutopilotPatch = Partial<Omit<AutopilotSettings, 'ap_last_run_at'>>;
 
@@ -71,7 +81,40 @@ export const AP_DEFAULTS: AutopilotSettings = {
   ap_auto_queue: false,
   ap_auto_min_fit: 70,
   ap_auto_per_run: 10,
+  ap_target_countries: [],
+  ap_target_business: '',
+  ap_target_roles: '',
+  ap_target_about: '',
+  ap_author_titles: '',
+  ap_author_industries: [],
 };
+
+/** Countries offered in the Target card (LinkedIn post search has no country filter; the AI check and People Search use them). */
+export const TARGET_COUNTRIES = [
+  'United States', 'Canada', 'United Kingdom', 'Australia', 'Ireland', 'New Zealand', 'United Arab Emirates', 'Saudi Arabia',
+  'Qatar', 'Germany', 'Netherlands', 'Singapore', 'South Africa', 'Pakistan', 'India',
+];
+/** LinkedIn Industry Codes V2 (ids checked against LinkedIn's table on Microsoft Learn, 25 Nov 2026). Other ids can be typed in. */
+export const LINKEDIN_INDUSTRIES: { id: number; label: string }[] = [
+  { id: 48, label: 'Construction' },
+  { id: 406, label: 'Building Construction' },
+  { id: 408, label: 'Residential Building Construction' },
+  { id: 413, label: 'Nonresidential Building Construction' },
+  { id: 51, label: 'Civil Engineering' },
+  { id: 435, label: 'Specialty Trade Contractors' },
+  { id: 453, label: 'Building Equipment Contractors (plumbing, HVAC, electrical)' },
+  { id: 460, label: 'Building Finishing Contractors (painting, flooring)' },
+  { id: 436, label: 'Building Structure and Exterior Contractors (roofing)' },
+  { id: 122, label: 'Facilities Services' },
+  { id: 1965, label: 'Janitorial Services' },
+  { id: 2934, label: 'Landscaping Services' },
+  { id: 91, label: 'Consumer Services' },
+  { id: 124, label: 'Wellness and Fitness Services' },
+  { id: 2190, label: 'Accommodation Services' },
+  { id: 34, label: 'Food and Beverage Services' },
+  { id: 110, label: 'Events Services' },
+  { id: 1916, label: 'Office Administration' },
+];
 
 /** Allowed ranges (the database refuses anything outside them). */
 export const AP_LIMITS = {
@@ -89,18 +132,40 @@ const SETTINGS_COLUMNS =
   'ap_on, ap_min_engagement, ap_max_age_days, ap_who, ap_posts_per_signal, ap_leads_per_run, ap_sync_per_run, ap_every_hours, ap_last_run_at, comment_pace, message_pace, sync_pace';
 
 const PHASE2_COLUMNS = ', ap_headline_include, ap_headline_exclude, ap_auto_queue, ap_auto_min_fit, ap_auto_per_run';
+const TARGET_COLUMNS = ', ap_target_countries, ap_target_business, ap_target_roles, ap_target_about, ap_author_titles, ap_author_industries';
+/** False when the Target columns are not in the database yet: the page then hides the Target card. */
+export let hasTarget = true;
 /** False when SQL h2 has not been run yet: the page then hides the phase 2/3 controls. */
 export let hasPhase2 = true;
 
 export async function loadAutopilotSettings(userId: string): Promise<Result<AutopilotSettings>> {
   if (!supabase) return notConfigured();
-  let res = await supabase.from('gab_comment_settings').select(SETTINGS_COLUMNS + (hasPhase2 ? PHASE2_COLUMNS : '')).eq('user_id', userId).maybeSingle();
+  const cols = () => SETTINGS_COLUMNS + (hasPhase2 ? PHASE2_COLUMNS : '') + (hasPhase2 && hasTarget ? TARGET_COLUMNS : '');
+  let res = await supabase.from('gab_comment_settings').select(cols()).eq('user_id', userId).maybeSingle();
+  if (res.error && hasTarget && isMissingColumn(res.error)) {
+    hasTarget = false;
+    res = await supabase.from('gab_comment_settings').select(cols()).eq('user_id', userId).maybeSingle();
+  }
   if (res.error && hasPhase2 && isMissingColumn(res.error)) {
     hasPhase2 = false;
     res = await supabase.from('gab_comment_settings').select(SETTINGS_COLUMNS).eq('user_id', userId).maybeSingle();
   }
   if (res.error) return { data: null, error: toFriendlyError(res.error) };
-  return { data: { ...AP_DEFAULTS, ...((res.data as Partial<AutopilotSettings> | null) ?? {}) }, error: null };
+  const row = (res.data as Partial<AutopilotSettings> | null) ?? {};
+  const merged = { ...AP_DEFAULTS, ...row };
+  // the database keeps empty text as null
+  return {
+    data: {
+      ...merged,
+      ap_target_countries: Array.isArray(row.ap_target_countries) ? row.ap_target_countries : [],
+      ap_target_business: row.ap_target_business ?? '',
+      ap_target_roles: row.ap_target_roles ?? '',
+      ap_target_about: row.ap_target_about ?? '',
+      ap_author_titles: row.ap_author_titles ?? '',
+      ap_author_industries: Array.isArray(row.ap_author_industries) ? row.ap_author_industries.map(Number).filter((n) => n > 0) : [],
+    },
+    error: null,
+  };
 }
 
 export async function saveAutopilotSettings(userId: string, clientId: string | null, patch: AutopilotPatch): Promise<FriendlyError | null> {
@@ -267,6 +332,9 @@ export interface WarmLead {
   connection_status: string | null;
   /** Synced, has a note, not queued or sent yet. */
   ready: boolean;
+  /** Lead engine AI check against the member's Target (null = not checked yet). */
+  gate_verdict?: 'fit' | 'not_fit' | 'unsure' | null;
+  gate_reason?: string | null;
 }
 
 function fromOldRow(l: AutopilotLead): WarmLead {
@@ -278,9 +346,21 @@ function fromOldRow(l: AutopilotLead): WarmLead {
   };
 }
 
+let hasGateV2 = true;   // gab_ap_warm_leads_v2 (with the AI check); falls back to the older function
 /** The latest people Autopilot found. Uses the phase 2 function when it exists. */
 export async function loadWarmLeads(limit = 100): Promise<Result<WarmLead[]>> {
   if (!supabase) return notConfigured();
+  if (hasPhase2 && hasGateV2) {
+    const v2 = await supabase.rpc('gab_ap_warm_leads_v2', { p_limit: limit });
+    if (!v2.error) {
+      return {
+        data: ((v2.data ?? []) as WarmLead[]).map((r) => ({ ...r, fit: r.fit === null || r.fit === undefined ? null : Number(r.fit) })),
+        error: null,
+      };
+    }
+    if (!isMissingAutopilot(v2.error)) return { data: null, error: toFriendlyError(v2.error) };
+    hasGateV2 = false;
+  }
   if (hasPhase2) {
     const { data, error } = await supabase.rpc('gab_ap_warm_leads', { p_limit: limit });
     if (!error) {
