@@ -68,9 +68,9 @@ function Step({ n, title, hint, children }: { n: number; title: string; hint: st
   return (
     <section className="rounded-2xl border border-slate-200 p-5">
       <div className="mb-4 flex items-start gap-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-500 bg-brand-50 text-sm font-bold text-brand-700">{n}</span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-brand-500 bg-brand-50 font-display text-base font-bold text-brand-700">{n}</span>
         <div>
-          <h3 className="font-display text-base font-semibold text-slate-900">{title}</h3>
+          <h3 className="font-display text-lg font-bold text-slate-900">{title}</h3>
           <p className="mt-0.5 text-sm text-slate-500">{hint}</p>
         </div>
       </div>
@@ -81,7 +81,7 @@ function Step({ n, title, hint, children }: { n: number; title: string; hint: st
 function Field({ id, label, help, children }: { id?: string; label: string; help?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-semibold text-slate-800">{label}</label>
+      <label htmlFor={id} className="font-display text-[15px] font-bold text-slate-900">{label}</label>
       {children}
       {help ? <div className="text-xs text-slate-500">{help}</div> : null}
     </div>
@@ -207,15 +207,15 @@ function TargetCard({ settings, busy, onSave, onAddKeyword, onSuggest = suggestT
 
         <div className="flex flex-col gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-slate-900">Let the AI suggest the rest</p>
+            <p className="font-display text-base font-bold text-slate-900">Let the AI suggest the rest</p>
             <p className="text-sm text-slate-600">Business types, roles, job titles, LinkedIn industries and keywords, from steps 1 and 2.</p>
             {ideasError ? <p className="mt-1 text-sm font-medium text-red-700">{ideasError}</p> : null}
           </div>
           <div className="flex shrink-0 gap-2">
             {ideas ? (
-              <button type="button" className="btn-secondary" disabled={ideasBusy} onClick={() => void askIdeas(true)}>{ideasBusy ? 'Thinking…' : 'More ideas'}</button>
+              <button type="button" className="btn-secondary px-5 font-bold" disabled={ideasBusy} onClick={() => void askIdeas(true)}>{ideasBusy ? 'Thinking…' : 'More ideas'}</button>
             ) : null}
-            <button type="button" className="btn-primary" disabled={ideasBusy || about.trim().length < 10} onClick={() => void askIdeas(false)}>
+            <button type="button" className="btn-primary px-5 font-bold" disabled={ideasBusy || about.trim().length < 10} onClick={() => void askIdeas(false)}>
               {ideasBusy && !ideas ? 'Thinking…' : ideas ? 'Suggest again' : 'Suggest'}
             </button>
           </div>
@@ -226,14 +226,14 @@ function TargetCard({ settings, busy, onSave, onAddKeyword, onSuggest = suggestT
             <div className="divide-y divide-slate-200">
               {rows.map(([name, list, use]) => (list.length ? (
                 <div key={name} className="flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-start">
-                  <span className="w-48 shrink-0 pt-1 text-sm font-semibold text-slate-900">{name}</span>
+                  <span className="w-48 shrink-0 pt-1 font-display text-[15px] font-bold text-slate-900">{name}</span>
                   <div className="flex flex-1 flex-wrap gap-2">{list.map((x) => <span key={x} className={valueChip}>{x}</span>)}</div>
                   <button type="button" className="btn-secondary shrink-0 px-3 py-1.5 text-sm" onClick={use}>Use these</button>
                 </div>
               ) : null))}
               {ideas.keywords.length ? (
                 <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start">
-                  <span className="w-48 shrink-0 pt-1 text-sm font-semibold text-slate-900">Keywords to follow</span>
+                  <span className="w-48 shrink-0 pt-1 font-display text-[15px] font-bold text-slate-900">Keywords to follow</span>
                   <div className="flex flex-1 flex-wrap gap-2">
                     {ideas.keywords.map((k) => {
                       const st = kwState[k];
