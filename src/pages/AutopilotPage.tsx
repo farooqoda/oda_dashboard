@@ -13,7 +13,6 @@ import {
   hasTarget,
   suggestTarget,
   type TargetSuggestions,
-  LINKEDIN_INDUSTRIES,
   TARGET_COUNTRIES,
   loadWarmLeads,
   loadAutopilotSettings,
@@ -34,6 +33,7 @@ import {
   type SignalStats,
   type WarmLead,
 } from '../lib/autopilot';
+import { LI_INDUSTRIES, LI_INDUSTRY_GROUPS } from '../data/linkedinIndustries';
 import { FIT_HIGH } from '../lib/constants';
 import { queueLeads } from '../lib/messages';
 import { kickAutopilot, useExtensionTask } from '../lib/extensionBridge';
@@ -59,8 +59,35 @@ const GATE_TEXT: Record<'fit' | 'not_fit' | 'unsure', { text: string; cls: strin
 
 const splitList = (s: string) => s.split(',').map((t) => t.trim()).filter(Boolean);
 
-/** Lead engine (25 Nov 2026): the member's ideal client. Keyword searches only show posts by these authors, and the AI checks
- *  every person against it before they reach the list. */
+/** Lead engine (26 Nov 2026): the member's ideal client, in four steps. Keyword searches only show posts by these authors,
+ *  and the AI checks every person against it before they reach the list. */
+const INDUSTRY_BY_ID = new Map(LI_INDUSTRIES.map(([id, name, g]) => [id, { name, group: LI_INDUSTRY_GROUPS[g] }]));
+const INDUSTRY_BY_NAME = new Map(LI_INDUSTRIES.map(([id, name]) => [name.toLowerCase(), id]));
+
+function Step({ n, title, hint, children }: { n: number; title: string; hint: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-500 bg-brand-50 text-sm font-bold text-brand-700">{n}</span>
+        <div>
+          <h3 className="font-display text-base font-semibold text-slate-900">{title}</h3>
+          <p className="mt-0.5 text-sm text-slate-500">{hint}</p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-5">{children}</div>
+    </section>
+  );
+}
+function Field({ id, label, help, children }: { id?: string; label: string; help?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-semibold text-slate-800">{label}</label>
+      {children}
+      {help ? <div className="text-xs text-slate-500">{help}</div> : null}
+    </div>
+  );
+}
+
 function TargetCard({ settings, busy, onSave, onAddKeyword, onSuggest = suggestTarget }: {
   settings: AutopilotSettings;
   busy: string | null;
@@ -69,186 +96,228 @@ function TargetCard({ settings, busy, onSave, onAddKeyword, onSuggest = suggestT
   onAddKeyword: (keyword: string) => Promise<string | null>;
   onSuggest?: typeof suggestTarget;
 }) {
-  const known = (id: number) => LINKEDIN_INDUSTRIES.some((x) => x.id === id);
   const [countries, setCountries] = useState<string[]>(settings.ap_target_countries);
   const [business, setBusiness] = useState(settings.ap_target_business);
   const [roles, setRoles] = useState(settings.ap_target_roles);
   const [about, setAbout] = useState(settings.ap_target_about);
   const [titles, setTitles] = useState(settings.ap_author_titles);
-  const [inds, setInds] = useState<number[]>(settings.ap_author_industries.filter(known));
-  const [otherIds, setOtherIds] = useState(settings.ap_author_industries.filter((id) => !known(id)).join(', '));
+  const [inds, setInds] = useState<number[]>(settings.ap_author_industries);
+  const [indSearch, setIndSearch] = useState('');
   const [done, setDone] = useState(false);
   const [ideas, setIdeas] = useState<TargetSuggestions | null>(null);
   const [ideasBusy, setIdeasBusy] = useState(false);
   const [ideasError, setIdeasError] = useState<string | null>(null);
   const [kwState, setKwState] = useState<Record<string, string>>({});
-  const askIdeas = async () => {
-    setIdeasBusy(true);
-    setIdeasError(null);
-    const r = await onSuggest(about.trim(), business.trim(), roles.trim());
-    setIdeasBusy(false);
-    if (r.error) { setIdeasError(r.error.message); return; }
-    setIdeas(r.data);
-    setKwState({});
-  };
-  const addKw = async (k: string) => {
-    setKwState((s) => ({ ...s, [k]: 'adding' }));
-    const err = await onAddKeyword(k);
-    setKwState((s) => ({ ...s, [k]: err ? err : 'added' }));
-  };
   useEffect(() => {
     setCountries(settings.ap_target_countries);
     setBusiness(settings.ap_target_business);
     setRoles(settings.ap_target_roles);
     setAbout(settings.ap_target_about);
     setTitles(settings.ap_author_titles);
-    setInds(settings.ap_author_industries.filter(known));
-    setOtherIds(settings.ap_author_industries.filter((id) => !known(id)).join(', '));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setInds(settings.ap_author_industries);
   }, [settings]);
 
-  const extra = splitList(otherIds).map((t) => Number(t)).filter((n) => Number.isInteger(n) && n > 0);
-  const allIds = Array.from(new Set([...inds, ...extra]));
+  const touch = () => setDone(false);
+  const uniq = (a: string[]) => a.filter((x, i) => a.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i);
+  const askIdeas = async (more: boolean) => {
+    setIdeasBusy(true);
+    setIdeasError(null);
+    const seen = more && ideas ? [...ideas.business_types, ...ideas.keywords] : [];
+    const r = await onSuggest(about.trim(), business.trim(), roles.trim(), countries, seen);
+    setIdeasBusy(false);
+    if (r.error) { setIdeasError(r.error.message); return; }
+    if (more && ideas) {
+      setIdeas({
+        business_types: uniq([...ideas.business_types, ...r.data.business_types]),
+        roles: uniq([...ideas.roles, ...r.data.roles]),
+        author_titles: uniq([...ideas.author_titles, ...r.data.author_titles]),
+        industries: uniq([...ideas.industries, ...r.data.industries]),
+        keywords: uniq([...ideas.keywords, ...r.data.keywords]),
+      });
+    } else {
+      setIdeas(r.data);
+      setKwState({});
+    }
+  };
+  const addKw = async (k: string) => {
+    setKwState((s) => ({ ...s, [k]: 'adding' }));
+    const err = await onAddKeyword(k);
+    setKwState((s) => ({ ...s, [k]: err ? err : 'added' }));
+  };
+
   const titleList = splitList(titles);
   const tooManyTitles = titleList.length > 8;
-  const tooManyIds = allIds.length > 10;
-  const badOther = splitList(otherIds).some((t) => !/^[0-9]{1,6}$/.test(t));
-  const now = JSON.stringify([countries, business.trim(), roles.trim(), about.trim(), titleList.join(', '), allIds]);
+  const tooManyIds = inds.length > 10;
+  const now = JSON.stringify([countries, business.trim(), roles.trim(), about.trim(), titleList.join(', '), inds]);
   const was = JSON.stringify([settings.ap_target_countries, settings.ap_target_business.trim(), settings.ap_target_roles.trim(),
     settings.ap_target_about.trim(), splitList(settings.ap_author_titles).join(', '), settings.ap_author_industries]);
   const changed = now !== was;
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-  const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1 text-xs font-medium ${on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`;
+  const chipBtn = (on: boolean) =>
+    `rounded-full border px-3 py-1 text-sm ${on ? 'border-brand-500 bg-brand-50 font-semibold text-brand-800' : 'border-slate-200 text-slate-700 hover:border-slate-400'}`;
+  const valueChip = 'rounded-md bg-slate-100 px-2.5 py-1 text-sm text-slate-800';
+  const q = indSearch.trim().toLowerCase();
+  const matches = q.length < 2 ? [] : LI_INDUSTRIES.filter(([id, name, g]) => !inds.includes(id) &&
+    (name.toLowerCase().includes(q) || LI_INDUSTRY_GROUPS[g].toLowerCase().includes(q))).slice(0, 8);
+  const ideaIndustryIds = (ideas?.industries ?? []).map((n) => INDUSTRY_BY_NAME.get(n.toLowerCase())).filter((x): x is number => typeof x === 'number');
+  const kwErrors = Object.values(kwState).filter((v) => v !== 'added' && v !== 'adding');
+
+  const rows: [string, string[], () => void][] = ideas ? [
+    ['Business types', ideas.business_types, () => { setBusiness(ideas.business_types.join(', ')); touch(); }],
+    ['Who decides', ideas.roles, () => { setRoles(ideas.roles.join(', ')); touch(); }],
+    ['Post authors\' job titles', ideas.author_titles, () => { setTitles(ideas.author_titles.slice(0, 8).join(', ')); touch(); }],
+    ['LinkedIn industries', ideas.industries, () => { setInds(ideaIndustryIds.slice(0, 10)); touch(); }],
+  ] : [];
 
   return (
     <Card
       className="mt-6"
       title="Who you want to reach"
-      description="Your ideal client. Keyword searches only show posts written by these people, and the AI checks every person against it before they reach your list. Empty fields mean no filter."
+      description="Your ideal client in four steps. Steps 1 and 2 tell the AI who you sell to; step 4 limits the LinkedIn searches. Empty fields mean no filter."
     >
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <label htmlFor="tg-about" className="flex flex-col gap-1 lg:col-span-2">
-          <span className="label">What you sell and who buys it</span>
-          <textarea id="tg-about" className="input min-h-[6rem]" maxLength={2000} value={about} onChange={(e) => { setAbout(e.target.value); setDone(false); }}
-            placeholder="e.g. AI that answers missed calls, replies to new leads in seconds and books the job. Best clients: owner-run plumbing and HVAC companies with 3-50 staff." />
-          <span className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-            <span>The more detail (services, best clients, who is not a fit), the better the AI check and the suggestions. Up to 2000 characters.</span>
-            <button type="button" className="btn-secondary px-3 py-1.5 text-xs" disabled={ideasBusy || about.trim().length < 10} onClick={() => void askIdeas()}>
-              {ideasBusy ? 'Thinking…' : 'Suggest from what I sell'}
+      <div className="flex flex-col gap-5">
+        <Step n={1} title="Your offer" hint="What you sell and who buys it. The AI check reads this for every person it judges.">
+          <Field id="tg-about" label="What you sell and who buys it"
+            help="Services, best clients, who is not a fit. More detail gives a better AI check and better suggestions. Up to 2000 characters.">
+            <textarea id="tg-about" className="input min-h-[7rem] text-sm" maxLength={2000} value={about} onChange={(e) => { setAbout(e.target.value); touch(); }}
+              placeholder="e.g. We automate LinkedIn for small businesses: posting, comments, replies and finding warm leads. Best clients: owner-run agencies, clinics and real estate teams." />
+          </Field>
+        </Step>
+
+        <Step n={2} title="Your buyers" hint="The businesses and people who decide to buy. Suggest and the AI check both use them.">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Field id="tg-business" label="Business types you sell to" help={'Separate with commas. Write "any business" if it really is everyone.'}>
+              <input id="tg-business" className="input" maxLength={300} value={business} onChange={(e) => { setBusiness(e.target.value); touch(); }}
+                placeholder="e.g. real estate agencies, dental clinics, marketing agencies" />
+            </Field>
+            <Field id="tg-roles" label="Who decides (roles)" help="Separate with commas.">
+              <input id="tg-roles" className="input" maxLength={200} value={roles} onChange={(e) => { setRoles(e.target.value); touch(); }}
+                placeholder="e.g. owner, founder, managing director" />
+            </Field>
+          </div>
+          <Field label="Countries" help="LinkedIn cannot filter posts by country; the AI check uses them, and People Search will too.">
+            <div className="flex flex-wrap gap-2">
+              {TARGET_COUNTRIES.map((c) => (
+                <button key={c} type="button" className={chipBtn(countries.includes(c))} aria-pressed={countries.includes(c)}
+                  onClick={() => { setCountries(toggle(countries, c)); touch(); }}>{c}</button>
+              ))}
+            </div>
+          </Field>
+        </Step>
+
+        <div className="flex flex-col gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Let the AI suggest the rest</p>
+            <p className="text-sm text-slate-600">Business types, roles, job titles, LinkedIn industries and keywords, from steps 1 and 2.</p>
+            {ideasError ? <p className="mt-1 text-sm font-medium text-red-700">{ideasError}</p> : null}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {ideas ? (
+              <button type="button" className="btn-secondary" disabled={ideasBusy} onClick={() => void askIdeas(true)}>{ideasBusy ? 'Thinking…' : 'More ideas'}</button>
+            ) : null}
+            <button type="button" className="btn-primary" disabled={ideasBusy || about.trim().length < 10} onClick={() => void askIdeas(false)}>
+              {ideasBusy && !ideas ? 'Thinking…' : ideas ? 'Suggest again' : 'Suggest'}
             </button>
-          </span>
-          {ideasError ? <span className="text-xs text-red-700">{ideasError}</span> : null}
-        </label>
+          </div>
+        </div>
+
         {ideas ? (
-          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Suggestions (nothing changes until you use them and press Save target)</p>
-            {([
-              ['Business types', ideas.business_types, () => { setBusiness(ideas.business_types.join(', ')); setDone(false); }],
-              ['Who decides', ideas.roles, () => { setRoles(ideas.roles.join(', ')); setDone(false); }],
-              ['Post authors\' job titles', ideas.author_titles, () => { setTitles(ideas.author_titles.slice(0, 8).join(', ')); setDone(false); }],
-            ] as [string, string[], () => void][]).map(([name, list, use]) => (list.length ? (
-              <div key={name} className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="w-40 shrink-0 font-medium text-slate-700">{name}</span>
-                {list.map((x) => <span key={x} className="rounded-full border border-slate-200 px-2.5 py-0.5 text-slate-700">{x}</span>)}
-                <button type="button" className="btn-secondary px-2.5 py-1 text-xs" onClick={use}>Use these</button>
-              </div>
-            ) : null))}
-            {ideas.keywords.length ? (
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="w-40 shrink-0 font-medium text-slate-700">Keywords to follow</span>
-                {ideas.keywords.map((k) => {
-                  const st = kwState[k];
-                  return (
-                    <span key={k} className="inline-flex items-center gap-1 rounded-full border border-slate-200 py-0.5 pl-2.5 pr-1 text-slate-700">
-                      {k}
-                      {st === 'added' ? (
-                        <span className="px-1.5 text-emerald-700">✓ added</span>
-                      ) : (
-                        <button type="button" className="rounded-full px-1.5 font-semibold text-brand-700 hover:bg-brand-50" disabled={st === 'adding'}
-                          title={st && st !== 'adding' ? st : 'Add to What to follow'} onClick={() => void addKw(k)}>
-                          {st === 'adding' ? '…' : '+ Add'}
-                        </button>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            ) : null}
-            {Object.values(kwState).some((v) => v !== 'added' && v !== 'adding') ? (
-              <p className="text-xs text-red-700">{Object.values(kwState).find((v) => v !== 'added' && v !== 'adding')}</p>
-            ) : null}
-          </div>
+          <Step n={3} title="Suggestions" hint="Nothing changes until you press Use these (and Save target below). Keywords are added to What to follow at once.">
+            <div className="divide-y divide-slate-200">
+              {rows.map(([name, list, use]) => (list.length ? (
+                <div key={name} className="flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-start">
+                  <span className="w-48 shrink-0 pt-1 text-sm font-semibold text-slate-900">{name}</span>
+                  <div className="flex flex-1 flex-wrap gap-2">{list.map((x) => <span key={x} className={valueChip}>{x}</span>)}</div>
+                  <button type="button" className="btn-secondary shrink-0 px-3 py-1.5 text-sm" onClick={use}>Use these</button>
+                </div>
+              ) : null))}
+              {ideas.keywords.length ? (
+                <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start">
+                  <span className="w-48 shrink-0 pt-1 text-sm font-semibold text-slate-900">Keywords to follow</span>
+                  <div className="flex flex-1 flex-wrap gap-2">
+                    {ideas.keywords.map((k) => {
+                      const st = kwState[k];
+                      return (
+                        <span key={k} className={`${valueChip} inline-flex items-center gap-1.5`}>
+                          {k}
+                          {st === 'added' ? (
+                            <span className="text-xs font-semibold text-emerald-700">✓ added</span>
+                          ) : (
+                            <button type="button" className="rounded px-1 text-xs font-bold text-brand-700 hover:underline" disabled={st === 'adding'}
+                              title={st && st !== 'adding' ? st : 'Add to What to follow'} onClick={() => void addKw(k)}>
+                              {st === 'adding' ? '…' : '+ Add'}
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <button type="button" className="btn-secondary shrink-0 px-3 py-1.5 text-sm"
+                    onClick={async () => { for (const k of ideas.keywords) { if (!kwState[k] || (kwState[k] !== 'added' && kwState[k] !== 'adding')) await addKw(k); } }}>
+                    Add all
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            {kwErrors.length ? <p className="text-sm font-medium text-red-700">{kwErrors[0]}</p> : null}
+          </Step>
         ) : null}
-        <label htmlFor="tg-business" className="flex flex-col gap-1">
-          <span className="label">Business types you sell to</span>
-          <input id="tg-business" className="input" maxLength={300} value={business} onChange={(e) => { setBusiness(e.target.value); setDone(false); }}
-            placeholder="e.g. plumbing, HVAC, roofing, cleaning" />
-          <span className="text-xs text-slate-500">Separate with commas.</span>
-        </label>
-        <label htmlFor="tg-roles" className="flex flex-col gap-1">
-          <span className="label">Who decides (roles)</span>
-          <input id="tg-roles" className="input" maxLength={200} value={roles} onChange={(e) => { setRoles(e.target.value); setDone(false); }}
-            placeholder="e.g. owner, founder, general manager" />
-          <span className="text-xs text-slate-500">Separate with commas.</span>
-        </label>
-        <fieldset className="flex flex-col gap-2 lg:col-span-2">
-          <legend className="label mb-1">Countries</legend>
-          <div className="flex flex-wrap gap-2">
-            {TARGET_COUNTRIES.map((c) => (
-              <button key={c} type="button" className={chip(countries.includes(c))} aria-pressed={countries.includes(c)}
-                onClick={() => { setCountries(toggle(countries, c)); setDone(false); }}>{c}</button>
-            ))}
-          </div>
-          <span className="text-xs text-slate-500">LinkedIn cannot filter posts by country; the AI check uses them, and People Search will too.</span>
-        </fieldset>
-        <label htmlFor="tg-titles" className="flex flex-col gap-1 lg:col-span-2">
-          <span className="label">Only posts written by people with these job titles</span>
-          <input id="tg-titles" className="input" maxLength={300} value={titles} onChange={(e) => { setTitles(e.target.value); setDone(false); }}
-            placeholder="e.g. Owner, Founder, President, CEO, General Manager" />
-          <span className={`text-xs ${tooManyTitles ? 'text-red-700' : 'text-slate-500'}`}>
-            Separate with commas, up to 8. LinkedIn matches any of them (Author keywords filter).
-          </span>
-        </label>
-        <fieldset className="flex flex-col gap-2 lg:col-span-2">
-          <legend className="label mb-1">Only posts written by people in these LinkedIn industries</legend>
-          <div className="flex flex-wrap gap-2">
-            {LINKEDIN_INDUSTRIES.map((x) => (
-              <button key={x.id} type="button" className={chip(inds.includes(x.id))} aria-pressed={inds.includes(x.id)}
-                onClick={() => { setInds(toggle(inds, x.id)); setDone(false); }}>{x.label}</button>
-            ))}
-          </div>
-          <label htmlFor="tg-other" className="mt-1 flex flex-col gap-1 sm:max-w-md">
-            <span className="text-xs text-slate-600">Other industry ids (LinkedIn Industry Codes V2)</span>
-            <input id="tg-other" className="input" maxLength={80} value={otherIds} onChange={(e) => { setOtherIds(e.target.value); setDone(false); }} placeholder="e.g. 44, 13" />
-          </label>
-          <span className={`text-xs ${tooManyIds || badOther ? 'text-red-700' : 'text-slate-500'}`}>
-            Up to 10 industries in total{badOther ? '; other ids must be numbers' : ''}.{' '}
-            <a className="underline" href="https://learn.microsoft.com/en-us/linkedin/shared/references/reference-tables/industry-codes-v2" target="_blank" rel="noopener noreferrer">LinkedIn's list</a>
-          </span>
-        </fieldset>
-      </div>
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={!changed || tooManyTitles || tooManyIds || badOther || busy === 'target'}
-          onClick={async () => {
-            await onSave({
-              ap_target_about: about.trim(),
-              ap_target_business: business.trim(),
-              ap_target_roles: roles.trim(),
-              ap_target_countries: countries,
-              ap_author_titles: titleList.join(', '),
-              ap_author_industries: allIds,
-              ap_target_updated_at: new Date().toISOString(),
-            }, 'target');
-            setDone(true);
-          }}
-        >
-          {busy === 'target' ? 'Saving…' : 'Save target'}
-        </button>
-        {done && !changed ? <span className="text-xs text-emerald-700">Saved. The next search uses it.</span> : null}
+
+        <Step n={ideas ? 4 : 3} title="LinkedIn search filters" hint="Keyword searches only show posts written by these people. Fewer, sharper filters give better posts.">
+          <Field id="tg-titles" label="Only posts written by people with these job titles"
+            help={<span className={tooManyTitles ? 'font-medium text-red-700' : ''}>Separate with commas, up to 8. LinkedIn matches any of them (Author keywords filter).</span>}>
+            <input id="tg-titles" className="input" maxLength={300} value={titles} onChange={(e) => { setTitles(e.target.value); touch(); }}
+              placeholder="e.g. Owner, Founder, CEO, Managing Director" />
+          </Field>
+          <Field id="tg-ind" label={`Only posts written by people in these LinkedIn industries (${inds.length} of 10)`}
+            help={<span className={tooManyIds ? 'font-medium text-red-700' : ''}>All 434 LinkedIn industries. Type at least two letters to search.</span>}>
+            {inds.length ? (
+              <div className="flex flex-wrap gap-2">
+                {inds.map((id) => (
+                  <span key={id} className="inline-flex items-center gap-1.5 rounded-full border border-brand-500 bg-brand-50 py-1 pl-3 pr-1.5 text-sm font-semibold text-brand-800">
+                    {INDUSTRY_BY_ID.get(id)?.name ?? `Industry ${id}`}
+                    <button type="button" aria-label="Remove" className="rounded-full px-1.5 text-brand-700 hover:bg-brand-100" onClick={() => { setInds(inds.filter((x) => x !== id)); touch(); }}>×</button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <input id="tg-ind" className="input sm:max-w-md" value={indSearch} onChange={(e) => setIndSearch(e.target.value)}
+              placeholder="Search industries, e.g. real estate, dentists, software" disabled={inds.length >= 10} />
+            {matches.length ? (
+              <ul className="flex flex-col divide-y divide-slate-200 rounded-xl border border-slate-200 sm:max-w-md">
+                {matches.map(([id, name, g]) => (
+                  <li key={id}>
+                    <button type="button" className="flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50"
+                      onClick={() => { setInds([...inds, id]); setIndSearch(''); touch(); }}>
+                      <span className="text-sm text-slate-900">{name}</span>
+                      <span className="text-xs text-slate-500">{LI_INDUSTRY_GROUPS[g]}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : q.length >= 2 ? <p className="text-xs text-slate-500">No industry matches “{indSearch.trim()}”.</p> : null}
+          </Field>
+        </Step>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="btn-primary" disabled={!changed || tooManyTitles || tooManyIds || busy === 'target'}
+            onClick={async () => {
+              await onSave({
+                ap_target_about: about.trim(),
+                ap_target_business: business.trim(),
+                ap_target_roles: roles.trim(),
+                ap_target_countries: countries,
+                ap_author_titles: titleList.join(', '),
+                ap_author_industries: inds,
+                ap_target_updated_at: new Date().toISOString(),
+              }, 'target');
+              setDone(true);
+            }}>
+            {busy === 'target' ? 'Saving…' : 'Save target'}
+          </button>
+          {done && !changed ? <span className="text-sm font-medium text-emerald-700">Saved. The next search uses it.</span> : null}
+          {changed ? <span className="text-sm text-slate-500">Unsaved changes</span> : null}
+        </div>
       </div>
     </Card>
   );
