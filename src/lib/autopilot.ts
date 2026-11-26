@@ -123,9 +123,11 @@ export interface TargetSuggestions {
   business_types: string[];
   roles: string[];
   author_titles: string[];
+  /** LinkedIn industry names (exact names from LinkedIn's list). */
+  industries: string[];
   keywords: string[];
 }
-export async function suggestTarget(about: string, business: string, roles: string): Promise<Result<TargetSuggestions>> {
+export async function suggestTarget(about: string, business: string, roles: string, countries: string[] = [], exclude: string[] = []): Promise<Result<TargetSuggestions>> {
   if (!supabase) return notConfigured();
   const t = await supabase.rpc('gab_ap_suggest_ticket');
   if (t.error) return { data: null, error: toFriendlyError(t.error) };
@@ -134,7 +136,7 @@ export async function suggestTarget(about: string, business: string, roles: stri
     res = await fetch(TARGET_SUGGEST_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticket: t.data, about, business, roles }),
+      body: JSON.stringify({ ticket: t.data, about, business, roles, countries: countries.join(', '), exclude: exclude.slice(0, 80) }),
     });
   } catch (cause) {
     return { data: null, error: { message: 'The suggestion service could not be reached.', hint: cause instanceof Error ? cause.message : null, code: 'NETWORK' } };
@@ -149,7 +151,7 @@ export async function suggestTarget(about: string, business: string, roles: stri
   }
   const arr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
   const s = j.suggestions;
-  return { data: { business_types: arr(s.business_types), roles: arr(s.roles), author_titles: arr(s.author_titles), keywords: arr(s.keywords) }, error: null };
+  return { data: { business_types: arr(s.business_types), roles: arr(s.roles), author_titles: arr(s.author_titles), industries: arr(s.industries), keywords: arr(s.keywords) }, error: null };
 }
 
 /** Allowed ranges (the database refuses anything outside them). */
